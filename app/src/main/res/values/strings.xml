@@ -6,4 +6,59 @@
     <string name="home_subtitle">Calendrier mural, planning hebdo imprimé ou planning d\'équipe à codes : tout est lu sur ce téléphone.</string>
     <string name="home_take_photo">Photographier un planning</string>
     <string name="home_import">Importer depuis la galerie</string>
+    <string name="home_recent_title">Derniers plannings</string>
+    <string name="home_see_all">Tout voir</string>
+
+    <string name="action_continue">Continuer</string>
+    <string name="action_back">Retour</string>
+    <string name="action_settings">Réglages</string>
+
+    <string name="status_kept">Retenu</string>
+    <string name="status_review">À revoir</string>
+    <string name="status_ignored">Ignoré</string>
+
+    <string name="slot_all_day">Journée entière</string>
+    <string name="slot_time_unknown">Heure inconnue</string>
+    <string name="slot_time_range">%1$s – %2$s</string>
+    <string name="slot_next_day">(+1 j)</string>
+    <string name="slot_detail_separator">%1$s · %2$s</string>
+    <string name="slot_select_cd">Sélectionner %1$s</string>
+
+    <plurals name="recent_to_review">
+        <item quantity="one">%d à revoir</item>
+        <item quantity="other">%d à revoir</item>
+    </plurals>
+    <plurals name="recent_added">
+        <item quantity="one">%d ajouté</item>
+        <item quantity="other">%d ajoutés</item>
+    </plurals>
+
+    <string name="screen_camera">Appareil photo</string>
+    <string name="screen_preview">Aperçu de la photo</string>
+    <string name="screen_analysis">Analyse en cours</string>
+    <string name="screen_results">Résultats</string>
+    <string name="screen_send">Envoi à l\'agenda</string>
+    <string name="screen_success">C\'est dans votre agenda</string>
+    <string name="screen_settings">Réglages</string>
+
+    <!-- Component gallery (previews only) -->
+    <string name="gallery_buttons">Boutons</string>
+    <string name="gallery_primary">Principal</string>
+    <string name="gallery_secondary">Secondaire</string>
+    <string name="gallery_tertiary">Tertiaire</string>
+    <string name="gallery_disabled">Désactivé</string>
+    <string name="gallery_chips">Puces de statut</string>
+    <string name="gallery_cards">Cartes de créneau</string>
+    <string name="gallery_banners">Bandeaux</string>
+    <string name="gallery_controls">Sélecteur, champ, interrupteur</string>
+    <string name="gallery_photos">Photos factices</string>
+    <string name="gallery_bar">Barre d\'actions</string>
+    <string name="gallery_banner_rotate">La photo semble tournée d\'un quart de tour.</string>
+    <string name="gallery_rotate_left">Pivoter ↺</string>
+    <string name="gallery_rotate_right">Pivoter ↻</string>
+    <string name="gallery_banner_info">2 créneaux déjà présents, ignorés.</string>
+    <string name="gallery_banner_error">Accès à l\'agenda refusé.</string>
+    <string name="gallery_segment_calendar">Agenda</string>
+    <string name="gallery_segment_photo">Photo</string>
+    <string name="gallery_field_start">Début</string>
 </resources>
