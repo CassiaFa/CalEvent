@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CalEvent</string>
+    <string name="offline_badge">Hors ligne · rien n\'est envoyé</string>
+    <string name="home_title">Du papier à votre agenda, en une photo.</string>
+    <string name="home_subtitle">Calendrier mural, planning hebdo imprimé ou planning d\'équipe à codes : tout est lu sur ce téléphone.</string>
+    <string name="home_take_photo">Photographier un planning</string>
+    <string name="home_import">Importer depuis la galerie</string>
+</resources>

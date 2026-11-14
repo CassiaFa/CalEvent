@@ -1,0 +1,15 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.kotlin/
+captures/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+CLAUDE.md
+prompt_design_app_standalone.mdCLAUDE.md
+brief_app_standalone.md
