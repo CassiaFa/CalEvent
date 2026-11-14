@@ -1,46 +1,242 @@
 package fr.calevent.app.ui.screens.send
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import fr.calevent.app.R
+import fr.calevent.app.data.DeviceCalendar
+import fr.calevent.app.data.FakeData
+import fr.calevent.app.ui.ScanUiState
 import fr.calevent.app.ui.ScanViewModel
+import fr.calevent.app.ui.components.Banner
+import fr.calevent.app.ui.components.BannerKind
 import fr.calevent.app.ui.components.BottomActionBar
 import fr.calevent.app.ui.components.PrimaryButton
 import fr.calevent.app.ui.components.ScreenScaffold
 import fr.calevent.app.ui.theme.CalEventTheme
 import fr.calevent.app.ui.theme.ThemeMode
+import fr.calevent.core.SendPlan
+import fr.calevent.core.toCalendarEvent
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
-/** Calendar choice and send (stub). */
+private val shortDate: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM", Locale.FRENCH)
+
+/** "16 – 29 nov." style period covered by the events to add, or null when there are none. */
+@Composable
+internal fun periodLabel(plan: SendPlan): String? {
+    val first = plan.events.minOfOrNull { it.start.toLocalDate() } ?: return null
+    val last = plan.events.maxOf { it.start.toLocalDate() }
+    return if (first == last) shortDate.format(first)
+    else stringResource(R.string.send_period_range, shortDate.format(first), shortDate.format(last))
+}
+
+/** Calendar choice, recap and confirmation. Stateless content lives in [SendContent]. */
 @Composable
 fun SendScreen(viewModel: ScanViewModel, onBack: () -> Unit, onNext: () -> Unit) {
+    val state by viewModel.uiState.collectAsState()
+    SendContent(state, onSelectCalendar = viewModel::selectCalendar, onBack = onBack, onConfirm = onNext)
+}
+
+@Composable
+private fun SendContent(
+    state: ScanUiState,
+    onSelectCalendar: (Long) -> Unit,
+    onBack: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val c = CalEventTheme.colors
+    val t = CalEventTheme.type
+    val plan = state.sendPlan
+    val calendar = state.selectedCalendar
+    val count = plan.events.size
+    val canConfirm = calendar != null && plan.canSend
     ScreenScaffold(
-        title = stringResource(R.string.screen_send),
+        title = stringResource(R.string.send_title),
         onBack = onBack,
         bottomBar = {
             BottomActionBar {
-                PrimaryButton(stringResource(R.string.action_continue), onClick = onNext, modifier = Modifier.fillMaxWidth())
+                PrimaryButton(
+                    text = pluralStringResource(R.plurals.send_confirm, count, count),
+                    onClick = onConfirm,
+                    enabled = canConfirm,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                val hint = when {
+                    calendar == null -> stringResource(R.string.send_choose_calendar_hint)
+                    !plan.canSend -> plan.duplicates.allPresentLabel ?: stringResource(R.string.send_all_present_hint)
+                    else -> null
+                }
+                if (hint != null) {
+                    Text(hint, style = t.secondary, color = c.ink2, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp))
+                }
             }
         },
     ) {
-        Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
-            Text(stringResource(R.string.screen_send), style = CalEventTheme.type.title, color = CalEventTheme.colors.ink)
+        Column(
+            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            Section(stringResource(R.string.send_calendar_section)) {
+                val groupDescription = stringResource(R.string.send_calendar_group_description)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .card()
+                        .selectableGroup()
+                        .semantics { contentDescription = groupDescription },
+                ) {
+                    if (state.calendars.isEmpty()) {
+                        Text(stringResource(R.string.send_calendar_none), style = t.body, color = c.ink2, modifier = Modifier.padding(16.dp))
+                    }
+                    state.calendars.forEachIndexed { index, cal ->
+                        if (index > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(c.line))
+                        CalendarRow(cal, selected = cal.id == state.selectedCalendarId, onClick = { onSelectCalendar(cal.id) })
+                    }
+                }
+            }
+            Section(stringResource(R.string.send_recap_section)) {
+                Column(Modifier.fillMaxWidth().card().padding(horizontal = 16.dp, vertical = 6.dp)) {
+                    Text(
+                        pluralStringResource(R.plurals.send_recap_count, count, count),
+                        style = t.bodyStrong,
+                        color = c.ink,
+                        modifier = Modifier.heightIn(min = 44.dp).wrapCenter(),
+                    )
+                    RecapLine(stringResource(R.string.send_recap_period_label), periodLabel(plan) ?: "–")
+                    RecapLine(
+                        stringResource(R.string.send_recap_calendar_label),
+                        calendar?.name ?: stringResource(R.string.send_recap_calendar_none),
+                    )
+                }
+            }
+            plan.duplicates.label?.let { Banner(BannerKind.Info, it) }
         }
     }
 }
 
-@Preview(widthDp = 390, heightDp = 844)
+private fun Modifier.wrapCenter(): Modifier = this.then(Modifier.fillMaxWidth()).padding(top = 10.dp)
+
 @Composable
-private fun SendScreenLightPreview() = CalEventTheme(ThemeMode.LIGHT) { SendScreen(ScanViewModel(), {}, {}) }
+private fun Modifier.card(): Modifier {
+    val c = CalEventTheme.colors
+    val shape = RoundedCornerShape(16.dp)
+    return this.clip(shape).background(c.surface, shape).border(1.dp, c.line, shape)
+}
+
+@Composable
+private fun Section(title: String, content: @Composable () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(title.uppercase(Locale.FRENCH), style = CalEventTheme.type.label, color = CalEventTheme.colors.ink2)
+        content()
+    }
+}
+
+@Composable
+private fun RecapLine(label: String, value: String) {
+    val c = CalEventTheme.colors
+    val t = CalEventTheme.type
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 44.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(label, style = t.secondary, color = c.ink2, modifier = Modifier.width(88.dp))
+        Text(value, style = t.bodyStrong, color = c.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun CalendarRow(calendar: DeviceCalendar, selected: Boolean, onClick: () -> Unit) {
+    val c = CalEventTheme.colors
+    val t = CalEventTheme.type
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 58.dp)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // The only colour outside the theme: the system calendar's own colour.
+        Box(Modifier.size(14.dp).background(Color(calendar.colorArgb), CircleShape))
+        Column(Modifier.weight(1f)) {
+            Text(calendar.name, style = t.bodyStrong, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(calendar.account, style = t.secondary, color = c.ink2, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        // Selection is conveyed by the radio itself; the row handles the click and semantics.
+        RadioButton(
+            selected = selected,
+            onClick = null,
+            colors = RadioButtonDefaults.colors(selectedColor = c.ink, unselectedColor = c.ink2),
+        )
+    }
+}
+
+private fun previewState(
+    selected: Long? = FakeData.calendars[1].id,
+    existing: Int = 2,
+) = ScanUiState(
+    slots = FakeData.weeklySlots,
+    calendars = FakeData.calendars,
+    selectedCalendarId = selected,
+    existingEvents = FakeData.weeklySlots.filter { it.isSelected }.take(existing).map { it.toCalendarEvent() },
+)
 
 @Preview(widthDp = 390, heightDp = 844)
 @Composable
-private fun SendScreenDarkPreview() = CalEventTheme(ThemeMode.DARK) { SendScreen(ScanViewModel(), {}, {}) }
+private fun SendLightPreview() = CalEventTheme(ThemeMode.LIGHT) { SendContent(previewState(existing = 0), {}, {}, {}) }
+
+@Preview(widthDp = 390, heightDp = 844)
+@Composable
+private fun SendDarkPreview() = CalEventTheme(ThemeMode.DARK) { SendContent(previewState(existing = 0), {}, {}, {}) }
+
+@Preview(widthDp = 390, heightDp = 844)
+@Composable
+private fun SendDuplicatesPreview() = CalEventTheme(ThemeMode.LIGHT) { SendContent(previewState(), {}, {}, {}) }
+
+@Preview(widthDp = 390, heightDp = 844)
+@Composable
+private fun SendDuplicatesDarkPreview() = CalEventTheme(ThemeMode.DARK) { SendContent(previewState(), {}, {}, {}) }
+
+@Preview(widthDp = 390, heightDp = 844)
+@Composable
+private fun SendNoCalendarPreview() = CalEventTheme(ThemeMode.LIGHT) { SendContent(previewState(selected = null), {}, {}, {}) }
+
+@Preview(widthDp = 390, heightDp = 844)
+@Composable
+private fun SendNoCalendarDarkPreview() = CalEventTheme(ThemeMode.DARK) { SendContent(previewState(selected = null), {}, {}, {}) }

@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.Image
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -165,8 +166,8 @@ private fun RecentPlanningCard(planning: RecentPlanning, onClick: () -> Unit) {
 
 @Preview(widthDp = 390, heightDp = 844)
 @Composable
-private fun HomeScreenLightPreview() = CalEventTheme(ThemeMode.LIGHT) { HomeScreen(ScanViewModel(), {}, {}, {}, {}, {}) }
+private fun HomeScreenLightPreview() = CalEventTheme(ThemeMode.LIGHT) { HomeScreen(remember { ScanViewModel() }, {}, {}, {}, {}, {}) }
 
 @Preview(widthDp = 390, heightDp = 844)
 @Composable
-private fun HomeScreenDarkPreview() = CalEventTheme(ThemeMode.DARK) { HomeScreen(ScanViewModel(), {}, {}, {}, {}, {}) }
+private fun HomeScreenDarkPreview() = CalEventTheme(ThemeMode.DARK) { HomeScreen(remember { ScanViewModel() }, {}, {}, {}, {}, {}) }

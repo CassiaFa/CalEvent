@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Camera -->
+    <string name="camera_close_cd">Fermer l\'appareil photo</string>
+    <string name="camera_offline">Hors ligne</string>
+    <string name="camera_flash_off">Flash : désactivé</string>
+    <string name="camera_flash_on">Flash : activé</string>
+    <string name="camera_flash_off_label">Off</string>
+    <string name="camera_flash_on_label">On</string>
+    <string name="camera_flash_toggle_cd">%1$s. Appuyer pour changer.</string>
+    <string name="camera_tip">À plat, bien éclairé, tout le tableau dans le cadre</string>
+    <string name="camera_frame_cd">Cadre de prise de vue du planning</string>
+    <string name="camera_import_cd">Importer depuis la galerie</string>
+    <string name="camera_shutter_cd">Prendre la photo</string>
+
+    <!-- Preview -->
+    <string name="preview_title">Aperçu</string>
+    <string name="preview_photo_cd">Photo du planning</string>
+    <string name="preview_rotate_left">Pivoter ↺</string>
+    <string name="preview_rotate_right">Pivoter ↻</string>
+    <string name="preview_rotate_left_cd">Pivoter d\'un quart de tour vers la gauche</string>
+    <string name="preview_rotate_right_cd">Pivoter d\'un quart de tour vers la droite</string>
+    <string name="preview_crop">Recadrer</string>
+    <string name="preview_crop_cd_on">Recadrer, activé</string>
+    <string name="preview_crop_cd_off">Recadrer, désactivé</string>
+    <string name="preview_retake">Reprendre</string>
+    <string name="preview_analyze">Analyser</string>
+    <string name="preview_hint">Analyse sur ce téléphone · quelques secondes</string>
+
+    <!-- Analysis -->
+    <string name="analysis_photo_cd">Photo du planning en cours d\'analyse</string>
+    <string name="analysis_headline_detect">Détection du tableau…</string>
+    <string name="analysis_headline_read">Lecture du planning…</string>
+    <string name="analysis_headline_structure">Structuration des créneaux…</string>
+    <string name="analysis_headline_done">Analyse terminée</string>
+    <string name="analysis_subtitle">Tout se passe sur ce téléphone, sans connexion.</string>
+    <string name="analysis_progress_cd">Progression de l\'analyse</string>
+    <string name="analysis_step_detect">Détection</string>
+    <string name="analysis_step_read">Lecture</string>
+    <string name="analysis_step_structure">Structuration</string>
+    <string name="analysis_detail_detect">Tableau trouvé · 13 lignes</string>
+    <string name="analysis_detail_read">Lecture des cases une à une</string>
+    <string name="analysis_detail_structure">Dates, horaires, créneaux</string>
+    <string name="analysis_state_done">Terminé</string>
+    <string name="analysis_state_running">En cours</string>
+    <string name="analysis_state_pending">À venir</string>
+    <string name="analysis_step_cd">Étape %1$d sur 3 : %2$s, %3$s</string>
+    <string name="analysis_cancel">Annuler</string>
+    <string name="analysis_offline_reminder">Hors ligne · rien n\'est envoyé</string>
+</resources>

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -39,8 +40,8 @@ fun SettingsScreen(viewModel: ScanViewModel, onBack: () -> Unit) {
 
 @Preview(widthDp = 390, heightDp = 844)
 @Composable
-private fun SettingsScreenLightPreview() = CalEventTheme(ThemeMode.LIGHT) { SettingsScreen(ScanViewModel(), {}) }
+private fun SettingsScreenLightPreview() = CalEventTheme(ThemeMode.LIGHT) { SettingsScreen(remember { ScanViewModel() }, {}) }
 
 @Preview(widthDp = 390, heightDp = 844)
 @Composable
-private fun SettingsScreenDarkPreview() = CalEventTheme(ThemeMode.DARK) { SettingsScreen(ScanViewModel(), {}) }
+private fun SettingsScreenDarkPreview() = CalEventTheme(ThemeMode.DARK) { SettingsScreen(remember { ScanViewModel() }, {}) }

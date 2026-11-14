@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="results_title">Planning hebdo</string>
+    <string name="results_subtitle">%1$s · %2$s</string>
+    <plurals name="results_slots_read">
+        <item quantity="one">%d créneau lu</item>
+        <item quantity="other">%d créneaux lus</item>
+    </plurals>
+    <string name="results_tab_agenda">Agenda</string>
+    <string name="results_tab_photo">Photo</string>
+
+    <plurals name="results_count_kept">
+        <item quantity="one">%d retenu</item>
+        <item quantity="other">%d retenus</item>
+    </plurals>
+    <plurals name="results_count_review">
+        <item quantity="one">%d à revoir</item>
+        <item quantity="other">%d à revoir</item>
+    </plurals>
+    <plurals name="results_count_ignored_show">
+        <item quantity="one">%d ignoré · afficher</item>
+        <item quantity="other">%d ignorés · afficher</item>
+    </plurals>
+    <plurals name="results_count_ignored_shown">
+        <item quantity="one">%d ignoré · affiché</item>
+        <item quantity="other">%d ignorés · affichés</item>
+    </plurals>
+
+    <plurals name="results_review_callout_title">
+        <item quantity="one">%d créneau à vérifier</item>
+        <item quantity="other">%d créneaux à vérifier</item>
+    </plurals>
+    <string name="results_review_callout_hint">Heure ou date mal lue · non cochés</string>
+    <string name="results_review_callout_action">Vérifier</string>
+
+    <string name="results_period_week">Semaine</string>
+    <string name="results_period_month">Mois</string>
+    <string name="results_period_previous_week">Semaine précédente</string>
+    <string name="results_period_next_week">Semaine suivante</string>
+    <string name="results_period_previous_month">Mois précédent</string>
+    <string name="results_period_next_month">Mois suivant</string>
+    <string name="results_empty">Aucun créneau à afficher.</string>
+
+    <string name="results_rotation_warning">La photo semble tournée d\'un quart de tour</string>
+    <string name="results_rotate_left">Pivoter ↺</string>
+    <string name="results_rotate_right">Pivoter ↻</string>
+    <string name="results_rotate_left_cd">Pivoter la photo d\'un quart de tour vers la gauche</string>
+    <string name="results_rotate_right_cd">Pivoter la photo d\'un quart de tour vers la droite</string>
+
+    <plurals name="results_add_slots">
+        <item quantity="one">Ajouter %d créneau à l\'agenda</item>
+        <item quantity="other">Ajouter %d créneaux à l\'agenda</item>
+    </plurals>
+    <string name="results_add_none">Aucun créneau sélectionné</string>
+    <string name="results_add_hint">Seuls les créneaux cochés seront ajoutés</string>
+
+    <string name="results_photo_hint">Touchez une zone pour l\'ouvrir</string>
+    <string name="results_photo_legend">Légende des zones</string>
+    <string name="results_photo_paper_title">PLANNING — SEMAINES 47 / 48</string>
+    <string name="results_zone_cd">%1$s : %2$s, %3$s</string>
+
+    <string name="slot_sheet_close">Fermer la fiche</string>
+    <string name="slot_status_confidence">%1$s · confiance %2$d %%</string>
+    <string name="slot_read_on_photo">Texte lu sur la photo</string>
+    <string name="slot_no_source_text">Aucun texte conservé</string>
+    <string name="slot_field_title">Titre</string>
+    <string name="slot_field_date">Date (JJ/MM/AAAA)</string>
+    <string name="slot_field_start">Début (HH:mm)</string>
+    <string name="slot_field_end">Fin (HH:mm)</string>
+    <string name="slot_field_location">Lieu</string>
+    <string name="slot_field_person">Personne</string>
+    <string name="slot_error_title">Le titre ne peut pas être vide.</string>
+    <string name="slot_error_date">Date invalide, utilisez JJ/MM/AAAA. Non enregistrée.</string>
+    <string name="slot_error_time">Heure invalide, utilisez HH:mm. Non enregistrée.</string>
+    <string name="slot_ignore">Ignorer</string>
+    <string name="slot_keep">Retenir</string>
+</resources>

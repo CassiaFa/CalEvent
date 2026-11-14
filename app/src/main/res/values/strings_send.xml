@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="send_title">Envoi vers l\'agenda</string>
+    <string name="send_calendar_section">Agenda du téléphone</string>
+    <string name="send_calendar_group_description">Choisir l\'agenda</string>
+    <string name="send_calendar_none">Aucun agenda disponible</string>
+    <string name="send_recap_section">Récapitulatif</string>
+    <string name="send_recap_period_label">Période</string>
+    <string name="send_recap_calendar_label">Agenda</string>
+    <string name="send_recap_calendar_none">Aucun agenda choisi</string>
+    <plurals name="send_recap_count">
+        <item quantity="one">%d créneau à ajouter</item>
+        <item quantity="other">%d créneaux à ajouter</item>
+    </plurals>
+    <string name="send_period_range">%1$s – %2$s</string>
+    <plurals name="send_confirm">
+        <item quantity="one">Ajouter %d créneau</item>
+        <item quantity="other">Ajouter %d créneaux</item>
+    </plurals>
+    <string name="send_all_present_hint">Rien de nouveau à ajouter</string>
+    <string name="send_choose_calendar_hint">Choisissez un agenda pour continuer</string>
+
+    <string name="success_title">Créneaux ajoutés</string>
+    <plurals name="success_headline">
+        <item quantity="one">%d créneau ajouté</item>
+        <item quantity="other">%d créneaux ajoutés</item>
+    </plurals>
+    <string name="success_calendar_line">Agenda %s</string>
+    <string name="success_calendar_period_line">Agenda %1$s · %2$s</string>
+    <string name="success_open_calendar">Ouvrir l\'agenda</string>
+    <string name="success_back_home">Retour à l\'accueil</string>
+</resources>
