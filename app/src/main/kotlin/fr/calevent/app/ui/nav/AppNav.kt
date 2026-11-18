@@ -28,6 +28,11 @@ import fr.calevent.app.ui.screens.send.SendScreen
 import fr.calevent.app.settings.Settings
 import fr.calevent.app.settings.SettingsRepository
 import fr.calevent.app.ui.screens.settings.AboutScreen
+import fr.calevent.app.ui.screens.settings.CodesScreen
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import fr.calevent.app.ui.screens.settings.DefaultCalendarScreen
 import fr.calevent.app.ui.screens.settings.LicensesScreen
 import fr.calevent.app.ui.screens.settings.PrivacyPolicyScreen
@@ -46,6 +51,7 @@ object Routes {
     const val Success = "success"
     const val Settings = "settings"
     const val SettingsCalendar = "settings/calendar"
+    const val SettingsCodes = "settings/codes?code={code}"
     const val SettingsPrivacy = "settings/privacy"
     const val SettingsAbout = "settings/about"
     const val SettingsPolicy = "settings/policy"
@@ -66,6 +72,13 @@ fun AppNav(
     val viewModel: ScanViewModel = viewModel()
     val back: () -> Unit = { navController.popBackStack() }
     LaunchedEffect(settings) { viewModel.applySettings(settings) }
+    val scope = rememberCoroutineScope()
+    val codeTable by settingsRepository.codeTable.collectAsState(initial = null)
+    // Slots with a now-defined code are recomputed from the table, without reading the photo again.
+    LaunchedEffect(codeTable) { codeTable?.let(viewModel::applyCodeTable) }
+    val openCodes: (String?) -> Unit = { code ->
+        navController.navigate(if (code == null) "settings/codes" else "settings/codes?code=${android.net.Uri.encode(code)}")
+    }
 
     val state by viewModel.uiState.collectAsState()
     val route = navController.currentBackStackEntryAsState().value?.destination?.route
@@ -123,6 +136,7 @@ fun AppNav(
                 viewModel,
                 onBack = back,
                 onNext = { navController.navigate(Routes.Send) },
+                onDefineCode = openCodes,
                 onReanalyze = { navController.navigate(Routes.Analysis) { popUpTo(Routes.Results) { inclusive = true } } },
             )
             }
@@ -141,12 +155,28 @@ fun AppNav(
                 viewModel, settings, settingsRepository,
                 onBack = back,
                 onOpenCalendar = { navController.navigate(Routes.SettingsCalendar) },
+                onOpenCodes = { openCodes(null) },
                 onOpenPrivacy = { navController.navigate(Routes.SettingsPrivacy) },
                 onOpenAbout = { navController.navigate(Routes.SettingsAbout) },
                 onOpenLicenses = { navController.navigate(Routes.SettingsLicenses) },
             )
         }
         composable(Routes.SettingsCalendar) { DefaultCalendarScreen(viewModel, settings, settingsRepository, onBack = back) }
+        composable(
+            Routes.SettingsCodes,
+            arguments = listOf(navArgument("code") { type = NavType.StringType; nullable = true; defaultValue = null }),
+        ) { entry ->
+            val table = codeTable
+            if (table != null) {
+                CodesScreen(
+                    table = table,
+                    newCode = entry.arguments?.getString("code"),
+                    onChange = { scope.launch { settingsRepository.setCodeTable(it) } },
+                    onReset = { scope.launch { settingsRepository.resetCodeTable() } },
+                    onBack = back,
+                )
+            }
+        }
         composable(Routes.SettingsPrivacy) { PrivacySettingsScreen(settings, settingsRepository, onBack = back) }
         composable(Routes.SettingsAbout) {
             AboutScreen(

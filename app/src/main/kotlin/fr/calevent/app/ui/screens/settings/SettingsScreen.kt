@@ -64,6 +64,7 @@ fun SettingsScreen(
     repository: SettingsRepository,
     onBack: () -> Unit,
     onOpenCalendar: () -> Unit,
+    onOpenCodes: () -> Unit,
     onOpenPrivacy: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenLicenses: () -> Unit,
@@ -71,6 +72,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
+    val codeTable by repository.codeTable.collectAsState(initial = null)
     var refresh by remember { mutableStateOf(0) }
     var confirmDelete by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -96,10 +98,12 @@ fun SettingsScreen(
     SettingsContent(
         calendarName = calendarName,
         me = settings.me,
+        codesCount = codeTable?.size,
         theme = settings.theme,
         photosSummary = stats?.let { stringResource(R.string.settings_photos_summary, it.count, formatSize(it.bytes)) },
         onBack = onBack,
         onOpenCalendar = onOpenCalendar,
+        onOpenCodes = onOpenCodes,
         onTheme = { scope.launch { repository.setTheme(it) } },
         onOpenPrivacy = onOpenPrivacy,
         onDeletePhotos = { confirmDelete = true },
@@ -112,10 +116,12 @@ fun SettingsScreen(
 internal fun SettingsContent(
     calendarName: String,
     me: String?,
+    codesCount: Int?,
     theme: ThemeMode,
     photosSummary: String?,
     onBack: () -> Unit,
     onOpenCalendar: () -> Unit,
+    onOpenCodes: () -> Unit,
     onTheme: (ThemeMode) -> Unit,
     onOpenPrivacy: () -> Unit,
     onDeletePhotos: () -> Unit,
@@ -136,7 +142,11 @@ internal fun SettingsContent(
                     // Team schedules are not built yet: the row is shown but not active.
                     SettingsRow(stringResource(R.string.settings_me), value = me ?: stringResource(R.string.settings_soon), enabled = false, onClick = {})
                     RowDivider()
-                    SettingsRow(stringResource(R.string.settings_codes), value = stringResource(R.string.settings_soon), enabled = false, onClick = {})
+                    SettingsRow(
+                        stringResource(R.string.settings_codes),
+                        value = codesCount?.let { pluralStringResource(R.plurals.codes_count, it, it) },
+                        onClick = onOpenCodes,
+                    )
                 }
             }
             Column {
@@ -213,7 +223,7 @@ internal fun DeletePhotosDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 
 @Composable
 private fun PreviewContent(mode: ThemeMode) = CalEventTheme(mode) {
-    SettingsContent("Travail", null, mode, "4 · 6,2 Mo", {}, {}, {}, {}, {}, {}, {})
+    SettingsContent("Travail", null, 9, mode, "4 · 6,2 Mo", {}, {}, {}, {}, {}, {}, {}, {})
 }
 
 @Preview(widthDp = 390, heightDp = 844)

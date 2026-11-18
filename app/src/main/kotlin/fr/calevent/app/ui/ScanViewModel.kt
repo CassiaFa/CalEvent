@@ -11,6 +11,7 @@ import fr.calevent.app.analysis.AnalysisStep
 import fr.calevent.app.analysis.ScanAnalyzer
 import fr.calevent.app.capture.CapturedPhotoStore
 import fr.calevent.core.ShiftCodeTable
+import fr.calevent.core.resolveUnknownCodes
 import fr.calevent.core.parse.ParseResult
 import fr.calevent.core.parse.ParseWarning
 import kotlinx.coroutines.CancellationException
@@ -100,6 +101,9 @@ data class ScanUiState(
     /** True when a person must be chosen to see slots. */
     val needsPerson: Boolean = people.isNotEmpty() && selectedPerson == null
 
+    /** Distinct shift codes still missing from the code table, in order of appearance. */
+    val unknownCodes: List<String> = slots.mapNotNull { it.unknownCode }.distinctBy { it.uppercase() }
+
     /** Count per status ("12 retenus · 3 à revoir"). */
     val summary: SlotSummary = SlotSummary.of(slots)
 
@@ -167,6 +171,21 @@ class ScanViewModel : ViewModel() {
             )
         }
         if (_uiState.value.selectedCalendarId != before) loadExistingIfReady()
+    }
+
+    /**
+     * Uses the user's code table from now on and recomputes the slots whose unknown code it now defines
+     * (title, times, status), keeping the user's decisions. The photo is not read again.
+     */
+    fun applyCodeTable(table: ShiftCodeTable) {
+        if (table == codes) return
+        codes = table
+        val before = _uiState.value.slots
+        val after = table.resolveUnknownCodes(before)
+        if (after != before) {
+            _uiState.update { it.copy(slots = after, sendResult = null, error = null) }
+            loadExistingIfReady()
+        }
     }
 
     /** Called when the send screen opens and each time the app resumes: re-checks the permission and reloads. */

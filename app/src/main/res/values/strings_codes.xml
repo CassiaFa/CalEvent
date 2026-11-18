@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="codes_title">Codes de planning</string>
+    <string name="codes_subtitle">Servent à traduire les plannings d\'équipe en créneaux lisibles.</string>
+    <plurals name="codes_count">
+        <item quantity="one">%d code</item>
+        <item quantity="other">%d codes</item>
+    </plurals>
+    <string name="codes_new_found">Nouveau code trouvé dans ce planning</string>
+    <string name="codes_save_named">Enregistrer %s</string>
+    <string name="codes_save">Enregistrer</string>
+    <string name="codes_cancel">Annuler</string>
+    <string name="codes_add">Ajouter un code</string>
+    <string name="codes_add_title">Nouveau code</string>
+    <string name="codes_edit_title">Modifier le code</string>
+    <string name="codes_edit_cd">Modifier le code %s</string>
+    <string name="codes_field_code">Code</string>
+    <string name="codes_field_label">Libellé</string>
+    <string name="codes_field_start">Début</string>
+    <string name="codes_field_end">Fin</string>
+    <string name="codes_pick_start_cd">Choisir l\'heure de début</string>
+    <string name="codes_pick_end_cd">Choisir l\'heure de fin</string>
+    <string name="codes_type_work">Travail</string>
+    <string name="codes_type_rest">Repos</string>
+    <string name="codes_type_absence">Absence</string>
+    <string name="codes_all_day">Journée entière</string>
+    <string name="codes_next_day">Finit le lendemain</string>
+    <string name="codes_all_day_no_detail">Journée entière · sans détail</string>
+    <string name="codes_hours">%1$s – %2$s</string>
+    <string name="codes_hours_night">%1$s → %2$s le lendemain</string>
+    <string name="codes_night_cd">Nuit</string>
+    <string name="codes_error_code_blank">Saisissez un code.</string>
+    <string name="codes_error_code_exists">Ce code existe déjà.</string>
+    <string name="codes_error_label">Saisissez un libellé.</string>
+    <string name="codes_error_times">Choisissez l\'heure de début et de fin.</string>
+    <string name="codes_delete">Supprimer ce code</string>
+    <string name="codes_delete_title">Supprimer le code %s ?</string>
+    <string name="codes_delete_message">Les prochains plannings qui l\'utilisent seront signalés comme code inconnu.</string>
+    <string name="codes_delete_confirm">Supprimer</string>
+    <string name="codes_reset">Rétablir les codes par défaut</string>
+    <string name="codes_reset_title">Rétablir les codes par défaut ?</string>
+    <string name="codes_reset_message">Vos modifications et vos codes ajoutés seront perdus.</string>
+    <string name="codes_reset_confirm">Rétablir</string>
+    <string name="codes_empty">Aucun code. Ajoutez-en un ou rétablissez les codes par défaut.</string>
+    <string name="codes_define">Définir ce code</string>
+    <plurals name="codes_unknown_banner">
+        <item quantity="one">%1$d code inconnu : %2$s</item>
+        <item quantity="other">%1$d codes inconnus : %2$s</item>
+    </plurals>
+    <string name="codes_unknown_define">Définir</string>
+</resources>

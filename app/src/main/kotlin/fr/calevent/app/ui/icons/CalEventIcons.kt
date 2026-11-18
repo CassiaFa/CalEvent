@@ -60,6 +60,8 @@ object CalEventIcons {
     val Trash = icon("Trash", paths = arrayOf("M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"))
     val External = icon("External", paths = arrayOf("M14 4h6v6M20 4l-9 9", "M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"))
     val Chevron = icon("Chevron", paths = arrayOf("M9 5l7 7-7 7"))
+    val Moon = icon("Moon", paths = arrayOf("M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"))
+    val Pencil = icon("Pencil", paths = arrayOf("M4 20h4L19 9l-4-4L4 16z"))
     val Plus = icon("Plus", paths = arrayOf("M12 5v14M5 12h14"))
     val Search = icon("Search", paths = arrayOf(circle(11f, 11f, 6.5f), "M16 16l4.5 4.5"))
     val Person = icon("Person", paths = arrayOf(circle(12f, 8f, 4f), "M4 20c0-4 3.6-6 8-6s8 2 8 6"))

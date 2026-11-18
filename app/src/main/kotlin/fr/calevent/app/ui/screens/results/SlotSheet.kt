@@ -85,7 +85,7 @@ internal fun Slot.withTimes(start: LocalTime?, end: LocalTime?): Slot =
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun SlotSheet(slot: Slot, onDismiss: () -> Unit, onUpdate: (Slot) -> Unit, photo: Bitmap? = null) {
+internal fun SlotSheet(slot: Slot, onDismiss: () -> Unit, onUpdate: (Slot) -> Unit, photo: Bitmap? = null, onDefineCode: ((String) -> Unit)? = null) {
     val c = CalEventTheme.colors
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
@@ -97,13 +97,13 @@ internal fun SlotSheet(slot: Slot, onDismiss: () -> Unit, onUpdate: (Slot) -> Un
         scrimColor = c.scrim,
         dragHandle = { BottomSheetDefaults.DragHandle(color = c.line) },
     ) {
-        SlotSheetContent(slot = slot, onUpdate = onUpdate, onClose = onDismiss, photo = photo)
+        SlotSheetContent(slot = slot, onUpdate = onUpdate, onClose = onDismiss, photo = photo, onDefineCode = onDefineCode?.let { f -> { code -> onDismiss(); f(code) } })
     }
 }
 
 /** Content of the sheet, separate from the Material container so that it can be previewed. */
 @Composable
-internal fun SlotSheetContent(slot: Slot, onUpdate: (Slot) -> Unit, onClose: () -> Unit, photo: Bitmap? = null) {
+internal fun SlotSheetContent(slot: Slot, onUpdate: (Slot) -> Unit, onClose: () -> Unit, photo: Bitmap? = null, onDefineCode: ((String) -> Unit)? = null) {
     val c = CalEventTheme.colors
     // Text being typed lives here; the slot is only replaced when the text is valid.
     var title by remember(slot.id) { mutableStateOf(slot.title) }
@@ -142,6 +142,15 @@ internal fun SlotSheetContent(slot: Slot, onUpdate: (Slot) -> Unit, onClose: () 
                     Icon(CalEventIcons.Warning, contentDescription = null, tint = c.review, modifier = Modifier.size(18.dp))
                     Text(slot.reviewReason!!, style = CalEventTheme.type.chip.copy(fontSize = 14.sp), color = c.review)
                 }
+            }
+            val unknown = slot.unknownCode
+            if (unknown != null && onDefineCode != null) {
+                SecondaryButton(
+                    stringResource(R.string.codes_define),
+                    onClick = { onDefineCode(unknown) },
+                    compact = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
             LabeledField(stringResource(R.string.slot_field_title), title, {
                 title = it

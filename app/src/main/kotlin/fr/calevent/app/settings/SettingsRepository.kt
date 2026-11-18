@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import fr.calevent.app.ui.theme.ThemeMode
 import fr.calevent.core.PhotoRetention
+import fr.calevent.core.ShiftCodeTable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -40,6 +41,14 @@ class SettingsRepository private constructor(context: Context) {
         )
     }
 
+    /** The user's shift code table; the built-in defaults until the user changes something. */
+    val codeTable: Flow<ShiftCodeTable> = store.data.map { p ->
+        p[CODE_TABLE]?.let { ShiftCodeTable.parse(it) } ?: ShiftCodeTable.default()
+    }
+
+    suspend fun setCodeTable(table: ShiftCodeTable) = store.edit { it[CODE_TABLE] = table.serialize() }
+    suspend fun resetCodeTable() = store.edit { it.remove(CODE_TABLE) }
+
     suspend fun setDefaultCalendar(id: Long?) = store.edit { if (id == null) it.remove(DEFAULT_CALENDAR) else it[DEFAULT_CALENDAR] = id }
     suspend fun setAlwaysAskCalendar(v: Boolean) = store.edit { it[ALWAYS_ASK] = v }
     suspend fun setSkipDuplicates(v: Boolean) = store.edit { it[SKIP_DUPLICATES] = v }
@@ -53,6 +62,7 @@ class SettingsRepository private constructor(context: Context) {
         private val SKIP_DUPLICATES = booleanPreferencesKey("skip_duplicates")
         private val THEME = stringPreferencesKey("theme")
         private val ME = stringPreferencesKey("me")
+        private val CODE_TABLE = stringPreferencesKey("shift_code_table")
         private val RETENTION = stringPreferencesKey("photo_retention")
 
         @Volatile private var instance: SettingsRepository? = null

@@ -72,6 +72,7 @@ fun ResultsScreen(
     onBack: () -> Unit,
     onNext: () -> Unit,
     onReanalyze: () -> Unit = {},
+    onDefineCode: (String) -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsState()
     val photo by viewModel.photoBitmap.collectAsState()
@@ -88,6 +89,7 @@ fun ResultsScreen(
             onReanalyze()
         },
         onSelectPerson = viewModel::selectPerson,
+        onDefineCode = onDefineCode,
         photo = photo,
     )
 }
@@ -104,6 +106,7 @@ internal fun ResultsContent(
     onRotate: (clockwise: Boolean, halfTurn: Boolean) -> Unit,
     onSelectPerson: (String?) -> Unit = {},
     onSetDecision: (String, UserDecision?) -> Unit = { _, _ -> },
+    onDefineCode: (String) -> Unit = {},
     photo: Bitmap? = null,
     initialTab: Int = 0,
 ) {
@@ -176,6 +179,17 @@ internal fun ResultsContent(
                 Text(subtitle, style = CalEventTheme.type.secondary, color = CalEventTheme.colors.ink2)
             }
             state.warnings.forEach { WarningBanner(it, onRotate) }
+            if (state.unknownCodes.isNotEmpty()) {
+                val codes = state.unknownCodes
+                val shown = codes.take(3).joinToString(", ") + if (codes.size > 3) "…" else ""
+                Banner(
+                    kind = BannerKind.Review,
+                    text = pluralStringResource(R.plurals.codes_unknown_banner, codes.size, codes.size, shown),
+                    actions = {
+                        SecondaryButton(stringResource(R.string.codes_unknown_define), onClick = { onDefineCode(codes.first()) }, compact = true)
+                    },
+                )
+            }
             if (state.people.isNotEmpty()) {
                 PersonRow(state.selectedPerson, onClick = { pickingPerson = true })
             }
@@ -230,6 +244,7 @@ internal fun ResultsContent(
             slot = openSlot,
             onDismiss = { openId = null },
             onUpdate = onUpdate,
+            onDefineCode = onDefineCode,
             photo = photo,
         )
     }
