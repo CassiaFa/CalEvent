@@ -1,5 +1,18 @@
 package fr.calevent.app.ui.screens.results
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import fr.calevent.core.UserDecision
+import kotlinx.coroutines.launch
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,12 +26,10 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -70,6 +81,7 @@ fun ResultsScreen(
         onNext = onNext,
         onToggle = viewModel::toggleSlot,
         onUpdate = viewModel::updateSlot,
+        onSetDecision = viewModel::setDecision,
         onShowIgnored = viewModel::setShowIgnored,
         onRotate = { clockwise, half ->
             viewModel.rotatePhoto(clockwise, half)
@@ -91,6 +103,7 @@ internal fun ResultsContent(
     onShowIgnored: (Boolean) -> Unit,
     onRotate: (clockwise: Boolean, halfTurn: Boolean) -> Unit,
     onSelectPerson: (String?) -> Unit = {},
+    onSetDecision: (String, UserDecision?) -> Unit = { _, _ -> },
     photo: Bitmap? = null,
     initialTab: Int = 0,
 ) {
@@ -109,6 +122,23 @@ internal fun ResultsContent(
         )
     } else {
         ""
+    }
+
+    val snackbarHost = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val ignoredMessage = stringResource(R.string.slot_ignored_snackbar)
+    val undoLabel = stringResource(R.string.slot_ignored_undo)
+    val currentSlots by rememberUpdatedState(slots)
+    fun swipe(id: String, decision: UserDecision) {
+        val previous = currentSlots.firstOrNull { it.id == id }?.decision
+        onSetDecision(id, decision)
+        if (decision == UserDecision.IGNORE) {
+            scope.launch {
+                snackbarHost.currentSnackbarData?.dismiss()
+                val result = snackbarHost.showSnackbar(ignoredMessage, actionLabel = undoLabel, duration = SnackbarDuration.Short)
+                if (result == SnackbarResult.ActionPerformed) onSetDecision(id, previous)
+            }
+        }
     }
 
     ScreenScaffold(
@@ -176,9 +206,20 @@ internal fun ResultsContent(
                     onReviewClick = { firstReview?.let { openId = it.id } },
                     onToggle = onToggle,
                     onOpen = { openId = it },
+                    onKeep = { swipe(it, UserDecision.KEEP) },
+                    onIgnore = { swipe(it, UserDecision.IGNORE) },
                 )
             } else {
                 PhotoView(slots = state.visibleSlots, onOpen = { openId = it }, photo = photo)
+            }
+            SnackbarHost(snackbarHost, Modifier.align(Alignment.BottomCenter).padding(horizontal = 12.dp, vertical = 8.dp)) { data ->
+                Snackbar(
+                    data,
+                    shape = RoundedCornerShape(14.dp),
+                    containerColor = CalEventTheme.colors.brand,
+                    contentColor = androidx.compose.ui.graphics.Color.White,
+                    actionColor = CalEventTheme.colors.accent,
+                )
             }
         }
     }

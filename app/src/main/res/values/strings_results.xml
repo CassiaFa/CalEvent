@@ -74,4 +74,17 @@
     <string name="slot_error_time">Heure invalide, utilisez HH:mm. Non enregistrée.</string>
     <string name="slot_ignore">Ignorer</string>
     <string name="slot_keep">Retenir</string>
+    <string name="slot_field_date_label">Date</string>
+    <string name="slot_swipe_add">Ajouter</string>
+    <string name="slot_swipe_ignore">Ignorer</string>
+    <string name="slot_ignored_snackbar">Créneau ignoré</string>
+    <string name="slot_ignored_undo">Annuler</string>
+    <string name="slot_wheel_hours">%1$s, heures</string>
+    <string name="slot_wheel_minutes">%1$s, minutes</string>
+    <string name="slot_date_pick_cd">Choisir la date</string>
+    <string name="slot_date_ok">OK</string>
+    <string name="slot_date_cancel">Annuler</string>
+    <string name="slot_time_summary">%1$s → %2$s</string>
+    <string name="slot_field_start_label">Début</string>
+    <string name="slot_field_end_label">Fin</string>
 </resources>
