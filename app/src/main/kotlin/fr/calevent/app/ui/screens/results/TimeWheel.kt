@@ -63,7 +63,7 @@ private fun Wheel(
     }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
     val rowPx = with(LocalDensity.current) { ROW_HEIGHT.toPx() }
-    val centered by remember {
+    val centered by remember(values) {
         derivedStateOf {
             val extra = if (listState.firstVisibleItemScrollOffset > rowPx / 2) 1 else 0
             (listState.firstVisibleItemIndex + extra).coerceIn(0, values.lastIndex)
@@ -85,7 +85,7 @@ private fun Wheel(
     }
     Box(
         modifier
-            .height(ROW_HEIGHT * 3)
+            .height(ROW_HEIGHT * 5)
             .semantics {
                 contentDescription = label
                 stateDescription = "%02d".format(values[centered])
@@ -100,7 +100,7 @@ private fun Wheel(
         LazyColumn(
             state = listState,
             flingBehavior = rememberSnapFlingBehavior(listState),
-            contentPadding = PaddingValues(vertical = ROW_HEIGHT),
+            contentPadding = PaddingValues(vertical = ROW_HEIGHT * 2),
             modifier = Modifier.fillMaxWidth().clearAndSetSemantics { },
         ) {
             itemsIndexed(values) { index, v ->
@@ -119,8 +119,9 @@ private fun Wheel(
 }
 
 /**
- * Hour (00-23) and minute (5-min steps) wheels. [onChange] is called after the user changes a wheel.
- * A minute that is not a multiple of 5 stays exact until the user touches the minute wheel.
+ * Hour (00-23) and minute wheels (every [minuteStep] minutes). [onChange] is called after the user changes a wheel.
+ * A minute that is not a multiple of the step stays exact until the user touches the minute wheel.
+ * Wheels are laid out on five rows; [showLabel] controls the caption above them.
  */
 @Composable
 internal fun TimeWheel(
@@ -129,28 +130,30 @@ internal fun TimeWheel(
     onChange: (LocalTime) -> Unit,
     slotKey: Any,
     modifier: Modifier = Modifier,
+    minuteStep: Int = 5,
+    showLabel: Boolean = true,
 ) {
     val c = CalEventTheme.colors
     val hours = remember { (0..23).toList() }
-    val minutes = remember { (0..55 step 5).toList() }
+    val minutes = remember(minuteStep) { (0..59 step minuteStep).toList() }
     var current by remember(slotKey) { mutableStateOf(time) }
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, style = CalEventTheme.type.label, color = c.ink2)
+        if (showLabel) Text(label, style = CalEventTheme.type.label, color = c.ink2)
         Row(
-            Modifier.padding(top = 4.dp),
+            Modifier.fillMaxWidth().padding(top = if (showLabel) 4.dp else 0.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Wheel(
                 hours, time.hour, stringResource(R.string.slot_wheel_hours, label),
                 onSelect = { h -> current = current.withHour(h); onChange(current) },
-                slotKey = slotKey, modifier = Modifier.width(64.dp),
+                slotKey = slotKey, modifier = Modifier.weight(1f),
             )
-            Text(":", style = CalEventTheme.type.section, color = c.ink)
+            Text(":", style = CalEventTheme.type.section, color = c.ink, modifier = Modifier.width(24.dp), textAlign = TextAlign.Center)
             Wheel(
                 minutes, time.minute, stringResource(R.string.slot_wheel_minutes, label),
                 onSelect = { m -> current = current.withMinute(m); onChange(current) },
-                slotKey = slotKey, modifier = Modifier.width(64.dp),
+                slotKey = slotKey, modifier = Modifier.weight(1f),
             )
         }
     }
