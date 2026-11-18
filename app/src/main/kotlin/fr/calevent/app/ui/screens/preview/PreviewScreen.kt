@@ -18,6 +18,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
+import fr.calevent.app.capture.AutoCrop
 import fr.calevent.app.capture.CapturedPhoto
 import fr.calevent.app.capture.CapturedPhotoStore
 import fr.calevent.app.capture.CropRect
@@ -37,6 +38,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -58,6 +60,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -89,6 +92,24 @@ fun PreviewScreen(viewModel: ScanViewModel, onBack: () -> Unit, onNext: () -> Un
     val t = CalEventTheme.type
     val photo by CapturedPhotoStore.photo.collectAsState()
     var cropping by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    val uri = photo?.uri
+    val turns = photo?.quarterTurns ?: 0
+    // Automatic pre-crop: OCR on a reduced bitmap, applied only if the user has not set a crop meanwhile.
+    var searching by remember { mutableStateOf(false) }
+    var autoApplied by rememberSaveable(uri.toString(), turns) { mutableStateOf(false) }
+    LaunchedEffect(uri, turns) {
+        if (uri == null || CapturedPhotoStore.isAutoCropDone(uri, turns)) return@LaunchedEffect
+        searching = true
+        val suggestion = try { AutoCrop.suggest(context) } finally { searching = false }
+        CapturedPhotoStore.markAutoCropDone(uri, turns)
+        val now = CapturedPhotoStore.photo.value
+        if (suggestion != null && now?.uri == uri && now.quarterTurns == turns && now.crop == null) {
+            CapturedPhotoStore.setCrop(suggestion)
+            cropping = true
+            autoApplied = true
+        }
+    }
     ScreenScaffold(
         title = stringResource(R.string.preview_title),
         onBack = onBack,
@@ -107,6 +128,38 @@ fun PreviewScreen(viewModel: ScanViewModel, onBack: () -> Unit, onNext: () -> Un
             cropping = cropping,
             modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 8.dp),
         )
+        val showFullAction = autoApplied && photo?.crop != null
+        if (searching || showFullAction) {
+            Row(
+                Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (searching) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(Modifier.size(16.dp), color = c.ink2, strokeWidth = 2.dp)
+                        Text(stringResource(R.string.preview_autocrop_searching), style = t.secondary, color = c.ink2)
+                    }
+                } else {
+                    Text(stringResource(R.string.preview_autocrop_applied), style = t.secondary, color = c.ink2)
+                    val fullCd = stringResource(R.string.preview_autocrop_full_cd)
+                    Box(
+                        Modifier
+                            .height(44.dp)
+                            .clickable(role = Role.Button) {
+                                CapturedPhotoStore.setCrop(null)
+                                cropping = false
+                                autoApplied = false
+                            }
+                            .padding(horizontal = 12.dp)
+                            .semantics { contentDescription = fullCd },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(stringResource(R.string.preview_autocrop_full), style = t.bodyStrong, color = c.ink, textDecoration = TextDecoration.Underline)
+                    }
+                }
+            }
+        }
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ToolButton(CalEventIcons.RotateLeft, stringResource(R.string.preview_rotate_left), stringResource(R.string.preview_rotate_left_cd), Modifier.weight(1f)) { CapturedPhotoStore.rotateLeft() }
             ToolButton(CalEventIcons.RotateRight, stringResource(R.string.preview_rotate_right), stringResource(R.string.preview_rotate_right_cd), Modifier.weight(1f)) { CapturedPhotoStore.rotateRight() }

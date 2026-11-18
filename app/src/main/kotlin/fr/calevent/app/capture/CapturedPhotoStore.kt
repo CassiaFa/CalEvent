@@ -57,6 +57,15 @@ object CapturedPhotoStore {
     /** Sets the crop (normalised 0..1, displayed orientation); null removes it. */
     fun setCrop(crop: CropRect?) = _photo.update { p -> p?.copy(crop = crop) }
 
+    // Last (photo, rotation) for which the automatic crop search finished, so coming back to the preview
+    // does not search again nor overwrite what the user chose.
+    private var autoCropDone: Pair<Uri, Int>? = null
+
+    /** True once the automatic crop search has finished for this photo at this rotation. */
+    fun isAutoCropDone(uri: Uri, quarterTurns: Int) = autoCropDone == uri to quarterTurns
+
+    fun markAutoCropDone(uri: Uri, quarterTurns: Int) { autoCropDone = uri to quarterTurns }
+
     /** Forgets the current photo and deletes its cache file. */
     fun clear() {
         deleteFile(_photo.value)

@@ -36,6 +36,10 @@
     <string name="preview_crop_cd_off">Recadrer, désactivé</string>
     <string name="preview_retake">Reprendre</string>
     <string name="preview_analyze">Analyser</string>
+    <string name="preview_autocrop_searching">Recherche du cadre…</string>
+    <string name="preview_autocrop_applied">Cadre proposé, ajustable</string>
+    <string name="preview_autocrop_full">Photo entière</string>
+    <string name="preview_autocrop_full_cd">Utiliser la photo entière, sans recadrage</string>
     <string name="preview_hint">Analyse sur ce téléphone · quelques secondes</string>
 
     <!-- Analysis -->
