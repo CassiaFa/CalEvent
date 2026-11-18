@@ -82,7 +82,7 @@ fun AppNav(navController: NavHostController = rememberNavController()) {
                 onSeeAll = { /* No history screen yet. */ },
             )
         }
-        composable(Routes.Camera) { CameraScreen(viewModel, onBack = back, onNext = { navController.navigate(Routes.Preview) }) }
+        composable(Routes.Camera) { CameraScreen(viewModel, onBack = goHome, onNext = { navController.navigate(Routes.Preview) }) }
         composable(Routes.Preview) {
             CompositionLocalProvider(LocalFlowClose provides closeFor(Routes.Preview)) {
                 PreviewScreen(viewModel, onBack = back, onNext = { navController.navigate(Routes.Analysis) })
