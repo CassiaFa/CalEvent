@@ -3,4 +3,11 @@
     <style name="Theme.CalEvent" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/window_bg</item>
     </style>
+
+    <!-- System splash (Android 12+ native, backported by core-splashscreen), then Theme.CalEvent. -->
+    <style name="Theme.CalEvent.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/window_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.CalEvent</item>
+    </style>
 </resources>
