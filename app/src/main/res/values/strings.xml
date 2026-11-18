@@ -11,6 +11,10 @@
 
     <string name="action_continue">Continuer</string>
     <string name="action_back">Retour</string>
+    <string name="action_close">Fermer</string>
+    <string name="abandon_title">Abandonner ce planning ?</string>
+    <string name="abandon_message">Les créneaux détectés ne seront pas ajoutés.</string>
+    <string name="abandon_confirm">Abandonner</string>
     <string name="action_settings">Réglages</string>
 
     <string name="status_kept">Retenu</string>
