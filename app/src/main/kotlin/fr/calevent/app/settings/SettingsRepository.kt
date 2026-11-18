@@ -23,6 +23,8 @@ data class Settings(
     /** Name of the user in team schedules ("Moi"). */
     val me: String? = null,
     val photoRetention: PhotoRetention = PhotoRetention.DAYS_30,
+    /** False until the first-launch presentation was finished or skipped. */
+    val onboardingDone: Boolean = true,
 )
 
 private val Context.settingsStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -38,6 +40,7 @@ class SettingsRepository private constructor(context: Context) {
             theme = p[THEME]?.let { n -> ThemeMode.entries.firstOrNull { it.name == n } } ?: ThemeMode.SYSTEM,
             me = p[ME]?.takeIf { it.isNotBlank() },
             photoRetention = p[RETENTION]?.let { n -> PhotoRetention.entries.firstOrNull { it.name == n } } ?: PhotoRetention.DAYS_30,
+            onboardingDone = p[ONBOARDING_DONE] ?: false,
         )
     }
 
@@ -54,6 +57,7 @@ class SettingsRepository private constructor(context: Context) {
     suspend fun setSkipDuplicates(v: Boolean) = store.edit { it[SKIP_DUPLICATES] = v }
     suspend fun setTheme(mode: ThemeMode) = store.edit { it[THEME] = mode.name }
     suspend fun setMe(name: String?) = store.edit { if (name.isNullOrBlank()) it.remove(ME) else it[ME] = name }
+    suspend fun setOnboardingDone(v: Boolean) = store.edit { it[ONBOARDING_DONE] = v }
     suspend fun setPhotoRetention(r: PhotoRetention) = store.edit { it[RETENTION] = r.name }
 
     companion object {
@@ -63,6 +67,7 @@ class SettingsRepository private constructor(context: Context) {
         private val THEME = stringPreferencesKey("theme")
         private val ME = stringPreferencesKey("me")
         private val CODE_TABLE = stringPreferencesKey("shift_code_table")
+        private val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         private val RETENTION = stringPreferencesKey("photo_retention")
 
         @Volatile private var instance: SettingsRepository? = null

@@ -63,6 +63,11 @@ object CalEventIcons {
     val Moon = icon("Moon", paths = arrayOf("M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"))
     val Pencil = icon("Pencil", paths = arrayOf("M4 20h4L19 9l-4-4L4 16z"))
     val Plus = icon("Plus", paths = arrayOf("M12 5v14M5 12h14"))
+    val ArrowRight = icon("ArrowRight", paths = arrayOf("M5 12h14M13 6l6 6-6 6"))
+    val WifiOff = icon(
+        "WifiOff",
+        paths = arrayOf("M3 3l18 18M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 5-2.7M14.5 10.4A10 10 0 0 1 19 13M2 9.5a15 15 0 0 1 4.5-2.9M10.7 5.1A15 15 0 0 1 22 9.5M12 20v.01"),
+    )
     val Search = icon("Search", paths = arrayOf(circle(11f, 11f, 6.5f), "M16 16l4.5 4.5"))
     val Person = icon("Person", paths = arrayOf(circle(12f, 8f, 4f), "M4 20c0-4 3.6-6 8-6s8 2 8 6"))
 }

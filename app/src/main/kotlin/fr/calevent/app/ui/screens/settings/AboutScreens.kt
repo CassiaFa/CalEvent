@@ -27,9 +27,9 @@ import fr.calevent.app.ui.icons.CalEventIcons
 import fr.calevent.app.ui.theme.CalEventTheme
 import fr.calevent.app.ui.theme.ThemeMode
 
-/** About (9e). "Revoir la présentation" is shown disabled until the onboarding exists. */
+/** About (9e). [onOpenIntro] replays the first-launch presentation. */
 @Composable
-fun AboutScreen(onBack: () -> Unit, onOpenPolicy: () -> Unit, onOpenLicenses: () -> Unit) {
+fun AboutScreen(onBack: () -> Unit, onOpenIntro: () -> Unit, onOpenPolicy: () -> Unit, onOpenLicenses: () -> Unit) {
     val c = CalEventTheme.colors
     ScreenScaffold(title = stringResource(R.string.settings_about_title), onBack = onBack) {
         Column(
@@ -46,7 +46,7 @@ fun AboutScreen(onBack: () -> Unit, onOpenPolicy: () -> Unit, onOpenLicenses: ()
                 }
             }
             SettingsGroup {
-                SettingsRow(stringResource(R.string.settings_about_intro), value = stringResource(R.string.settings_soon), enabled = false, onClick = {})
+                SettingsRow(stringResource(R.string.settings_about_intro), onClick = onOpenIntro)
                 RowDivider()
                 SettingsRow(stringResource(R.string.settings_about_policy), onClick = onOpenPolicy)
                 RowDivider()
@@ -106,8 +106,8 @@ fun LicensesScreen(onBack: () -> Unit) {
 
 @Preview(widthDp = 390, heightDp = 844)
 @Composable
-private fun AboutLightPreview() = CalEventTheme(ThemeMode.LIGHT) { AboutScreen({}, {}, {}) }
+private fun AboutLightPreview() = CalEventTheme(ThemeMode.LIGHT) { AboutScreen({}, {}, {}, {}) }
 
 @Preview(widthDp = 390, heightDp = 844)
 @Composable
-private fun AboutDarkPreview() = CalEventTheme(ThemeMode.DARK) { AboutScreen({}, {}, {}) }
+private fun AboutDarkPreview() = CalEventTheme(ThemeMode.DARK) { AboutScreen({}, {}, {}, {}) }

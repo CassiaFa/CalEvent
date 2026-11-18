@@ -38,7 +38,9 @@ class MainActivity : ComponentActivity() {
             runCatching { PhotoStorage.purgeExpired(applicationContext, repository.settings.first().photoRetention) }
         }
         setContent {
-            val settings by repository.settings.collectAsState(initial = Settings())
+            // null until DataStore answered: the splash stays so the first screen (onboarding or home) is the right one.
+            val loaded by repository.settings.collectAsState(initial = null)
+            val settings = loaded ?: Settings()
             CalEventTheme(settings.theme) {
                 var showSplash by remember { mutableStateOf(coldStart) }
                 LaunchedEffect(Unit) {
@@ -47,7 +49,7 @@ class MainActivity : ComponentActivity() {
                         showSplash = false
                     }
                 }
-                if (showSplash) SplashScreen() else AppNav(settings, repository)
+                if (showSplash || loaded == null) SplashScreen() else AppNav(settings, repository)
             }
         }
     }

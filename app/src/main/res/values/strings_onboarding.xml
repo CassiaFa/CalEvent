@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onb_skip">Passer</string>
+    <string name="onb_continue">Continuer</string>
+    <string name="onb_start">Commencer</string>
+    <string name="onb_page_cd">Écran %1$d sur %2$d</string>
+    <string name="onb_1_title">Du planning papier à votre agenda</string>
+    <string name="onb_1_body">Photographiez un planning : CalEvent repère les créneaux, vous les vérifiez, puis ils rejoignent l\'agenda de votre téléphone.</string>
+    <string name="onb_2_title">Rien ne quitte votre téléphone</string>
+    <string name="onb_2_body">La lecture des photos se fait sur l\'appareil. Pas de compte, pas de serveur, pas d\'envoi. L\'app fonctionne même en mode avion.</string>
+    <string name="onb_3_title">Les autorisations, au bon moment</string>
+    <string name="onb_3_body">Rien n\'est demandé maintenant. Chaque accès vous est proposé quand il devient utile, avec la raison.</string>
+    <string name="onb_perm_camera">Caméra</string>
+    <string name="onb_perm_camera_note">Demandée à votre première photo</string>
+    <string name="onb_perm_calendar">Agenda</string>
+    <string name="onb_perm_calendar_note">Demandé au premier ajout de créneaux</string>
+    <string name="onb_perm_gallery_note">Sans la caméra, vous pouvez toujours importer une photo depuis la galerie.</string>
+</resources>

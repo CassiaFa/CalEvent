@@ -21,7 +21,9 @@ import androidx.navigation.compose.rememberNavController
 import fr.calevent.app.ui.ScanViewModel
 import fr.calevent.app.ui.screens.analysis.AnalysisScreen
 import fr.calevent.app.ui.screens.camera.CameraScreen
+import fr.calevent.app.ui.screens.history.HistoryScreen
 import fr.calevent.app.ui.screens.home.HomeScreen
+import fr.calevent.app.ui.screens.onboarding.OnboardingScreen
 import fr.calevent.app.ui.screens.preview.PreviewScreen
 import fr.calevent.app.ui.screens.results.ResultsScreen
 import fr.calevent.app.ui.screens.send.SendScreen
@@ -42,7 +44,9 @@ import fr.calevent.app.ui.screens.success.SuccessScreen
 
 /** Route names. Flow: home > camera > preview > analysis > results > send > success; settings from home. */
 object Routes {
+    const val Onboarding = "onboarding"
     const val Home = "home"
+    const val History = "history"
     const val Camera = "camera"
     const val Preview = "preview"
     const val Analysis = "analysis"
@@ -94,23 +98,35 @@ fun AppNav(
     val closeFor: (String) -> (() -> Unit)? = { if (it in flowRoutes) flowClose else null }
     if (confirmAbandon) AbandonDialog(onConfirm = goHome, onDismiss = { confirmAbandon = false })
 
+    // Decided once: finishing the presentation must not rebuild the graph.
+    val startDestination = remember { if (settings.onboardingDone) Routes.Home else Routes.Onboarding }
     val fadeMs = 180
     NavHost(
         navController = navController,
-        startDestination = Routes.Home,
+        startDestination = startDestination,
         enterTransition = { fadeIn(tween(fadeMs)) },
         exitTransition = { fadeOut(tween(fadeMs)) },
         popEnterTransition = { fadeIn(tween(fadeMs)) },
         popExitTransition = { fadeOut(tween(fadeMs)) },
     ) {
+        composable(Routes.Onboarding) {
+            val finish: () -> Unit = {
+                scope.launch { settingsRepository.setOnboardingDone(true) }
+                // Replayed from Settings: go back there; first launch: go to Home.
+                if (!navController.popBackStack(Routes.SettingsAbout, false)) {
+                    navController.navigate(Routes.Home) { popUpTo(Routes.Onboarding) { inclusive = true }; launchSingleTop = true }
+                }
+            }
+            OnboardingScreen(onFinish = finish)
+        }
+        composable(Routes.History) { HistoryScreen(viewModel, onBack = back) }
         composable(Routes.Home) {
             HomeScreen(
                 viewModel = viewModel,
                 onTakePhoto = { navController.navigate(Routes.Camera) },
                 onImport = { navController.navigate(Routes.Preview) }, // called once the picked photo is imported
                 onOpenSettings = { navController.navigate(Routes.Settings) },
-                onOpenRecent = { navController.navigate(Routes.Results) },
-                onSeeAll = { /* No history screen yet. */ },
+                onSeeAll = { navController.navigate(Routes.History) },
             )
         }
         composable(Routes.Camera) { CameraScreen(viewModel, onBack = goHome, onNext = { navController.navigate(Routes.Preview) }) }
@@ -182,6 +198,7 @@ fun AppNav(
         composable(Routes.SettingsAbout) {
             AboutScreen(
                 onBack = back,
+                onOpenIntro = { navController.navigate(Routes.Onboarding) },
                 onOpenPolicy = { navController.navigate(Routes.SettingsPolicy) },
                 onOpenLicenses = { navController.navigate(Routes.SettingsLicenses) },
             )
