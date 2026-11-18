@@ -24,6 +24,7 @@ import fr.calevent.app.data.RecentPlanning
 import fr.calevent.core.CalendarEvent
 import fr.calevent.core.SendPlan
 import fr.calevent.core.Slot
+import fr.calevent.core.UserDecision
 import fr.calevent.core.SlotSummary
 import fr.calevent.core.displaySlots
 import fr.calevent.core.toCalendarEvent
@@ -326,6 +327,11 @@ class ScanViewModel : ViewModel() {
     /** Selected slot becomes ignored; any other slot becomes kept. */
     fun toggleSlot(id: String) = _uiState.update { s ->
         s.copy(slots = s.slots.map { if (it.id == id) (if (it.isSelected) it.ignore() else it.keep()) else it })
+    }
+
+    /** Sets (or, with null, clears) the user's decision on a slot; used by swipes and their undo. */
+    fun setDecision(id: String, decision: UserDecision?) = _uiState.update { s ->
+        s.copy(slots = s.slots.map { if (it.id == id) it.copy(decision = decision) else it })
     }
 
     /** Replaces the slot with the same id (after editing it). */

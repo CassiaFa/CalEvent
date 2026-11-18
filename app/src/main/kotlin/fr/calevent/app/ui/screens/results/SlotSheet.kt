@@ -1,6 +1,20 @@
 package fr.calevent.app.ui.screens.results
 
 import android.graphics.Bitmap
+import android.content.res.Configuration
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDefaults
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import java.time.Instant
+import java.time.ZoneOffset
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -10,7 +24,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -62,19 +75,17 @@ import fr.calevent.core.SlotStatus
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-import java.time.format.ResolverStyle
 import java.util.Locale
 
 private val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-private val DATE_FORMAT: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("dd/MM/uuuu", Locale.FRENCH).withResolverStyle(ResolverStyle.STRICT)
-private val TIME_REGEX = Regex("""^([01]\d|2[0-3]):([0-5]\d)$""")
+private val DATE_LABEL_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM uuuu", Locale.FRANCE)
 
-/** Strict "HH:mm" parser; null when [text] is not a valid time. */
-internal fun parseTime(text: String): LocalTime? =
-    TIME_REGEX.matchEntire(text.trim())?.let { LocalTime.of(it.groupValues[1].toInt(), it.groupValues[2].toInt()) }
+private val DEFAULT_START: LocalTime = LocalTime.of(9, 0)
+private val DEFAULT_END: LocalTime = LocalTime.of(17, 0)
 
-private fun parseDate(text: String): LocalDate? = runCatching { LocalDate.parse(text.trim(), DATE_FORMAT) }.getOrNull()
+/** The slot with new times; a night (end before start) automatically ends the next day. */
+private fun Slot.withTimes(start: LocalTime?, end: LocalTime?): Slot =
+    copy(start = start, end = end, endsNextDay = start != null && end != null && end < start)
 
 /**
  * Slot sheet (Material 3 modal bottom sheet). Edits are saved through [onUpdate] as soon as they are valid;
@@ -104,16 +115,10 @@ internal fun SlotSheetContent(slot: Slot, onUpdate: (Slot) -> Unit, onClose: () 
     val c = CalEventTheme.colors
     // Text being typed lives here; the slot is only replaced when the text is valid.
     var title by remember(slot.id) { mutableStateOf(slot.title) }
-    var dateText by remember(slot.id) { mutableStateOf(slot.date.format(DATE_FORMAT)) }
-    var startText by remember(slot.id) { mutableStateOf(slot.start?.format(TIME_FORMAT).orEmpty()) }
-    var endText by remember(slot.id) { mutableStateOf(slot.end?.format(TIME_FORMAT).orEmpty()) }
     var location by remember(slot.id) { mutableStateOf(slot.location.orEmpty()) }
     var person by remember(slot.id) { mutableStateOf(slot.person.orEmpty()) }
 
     val titleError = title.isBlank()
-    val dateError = parseDate(dateText) == null
-    val startError = startText.isNotBlank() && parseTime(startText) == null
-    val endError = endText.isNotBlank() && parseTime(endText) == null
     val status = slot.status
 
     Column(Modifier.fillMaxWidth().imePadding()) {
@@ -148,23 +153,36 @@ internal fun SlotSheetContent(slot: Slot, onUpdate: (Slot) -> Unit, onClose: () 
                 if (it.isNotBlank()) onUpdate(slot.copy(title = it.trim()))
             })
             if (titleError) FieldError(stringResource(R.string.slot_error_title))
-            LabeledField(stringResource(R.string.slot_field_date), dateText, {
-                dateText = it
-                parseDate(it)?.let { d -> onUpdate(slot.copy(date = d)) }
-            })
-            if (dateError) FieldError(stringResource(R.string.slot_error_date))
+            DateField(slot.date) { onUpdate(slot.copy(date = it)) }
             if (!slot.allDay) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    LabeledField(stringResource(R.string.slot_field_start), startText, {
-                        startText = it
-                        if (it.isBlank()) onUpdate(slot.copy(start = null)) else parseTime(it)?.let { t -> onUpdate(slot.copy(start = t)) }
-                    }, Modifier.weight(1f))
-                    LabeledField(stringResource(R.string.slot_field_end), endText, {
-                        endText = it
-                        if (it.isBlank()) onUpdate(slot.copy(end = null)) else parseTime(it)?.let { t -> onUpdate(slot.copy(end = t)) }
-                    }, Modifier.weight(1f))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    TimeWheel(
+                        stringResource(R.string.slot_field_start_label), slot.start ?: DEFAULT_START,
+                        onChange = { onUpdate(slot.withTimes(it, slot.end)) }, slotKey = slot.id,
+                    )
+                    TimeWheel(
+                        stringResource(R.string.slot_field_end_label), slot.end ?: DEFAULT_END,
+                        onChange = { onUpdate(slot.withTimes(slot.start, it)) }, slotKey = slot.id,
+                    )
                 }
-                if (startError || endError) FieldError(stringResource(R.string.slot_error_time))
+                val start = slot.start
+                val end = slot.end
+                Text(
+                    when {
+                        start == null && end == null -> stringResource(R.string.slot_time_unknown)
+                        else -> {
+                            val range = stringResource(
+                                R.string.slot_time_summary,
+                                start?.format(TIME_FORMAT) ?: "--:--", end?.format(TIME_FORMAT) ?: "--:--",
+                            )
+                            if (slot.endsNextDay) "$range ${stringResource(R.string.slot_next_day)}" else range
+                        }
+                    },
+                    style = CalEventTheme.type.bodyStrong.copy(fontFeatureSettings = "tnum"),
+                    color = c.ink,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
             }
             ToggleRow(
                 label = stringResource(R.string.slot_all_day),
@@ -199,6 +217,93 @@ internal fun SlotSheetContent(slot: Slot, onUpdate: (Slot) -> Unit, onClose: () 
                 onUpdate(slot.keep())
                 onClose()
             }, modifier = Modifier.weight(1.6f))
+        }
+    }
+}
+
+/** Date row: opens a French Material 3 date picker (Monday first, local dates). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateField(date: LocalDate, onPick: (LocalDate) -> Unit) {
+    val c = CalEventTheme.colors
+    var open by remember { mutableStateOf(false) }
+    val cd = stringResource(R.string.slot_date_pick_cd)
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            stringResource(R.string.slot_field_date_label),
+            style = CalEventTheme.type.label, color = c.ink2, modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 52.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(c.surface2)
+                .clickable(role = Role.Button, onClickLabel = cd) { open = true }
+                .padding(horizontal = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                date.format(DATE_LABEL_FORMAT).replaceFirstChar { it.uppercase(Locale.FRANCE) },
+                style = CalEventTheme.type.bodyStrong, color = c.ink, modifier = Modifier.weight(1f),
+            )
+            Icon(CalEventIcons.Calendar, contentDescription = null, tint = c.ink2, modifier = Modifier.size(22.dp))
+        }
+    }
+    if (open) {
+        // Force French labels and a Monday-first week whatever the system locale is.
+        val base = LocalConfiguration.current
+        val frConfig = remember(base) { Configuration(base).apply { setLocale(Locale.FRANCE) } }
+        val baseContext = LocalContext.current
+        val frContext = remember(baseContext, frConfig) { baseContext.createConfigurationContext(frConfig) }
+        CompositionLocalProvider(LocalConfiguration provides frConfig, LocalContext provides frContext) {
+            // The picker works in UTC midnight millis: convert from / to the local date explicitly.
+            val state = rememberDatePickerState(
+                initialSelectedDateMillis = date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+                initialDisplayedMonthMillis = date.withDayOfMonth(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+            )
+            DatePickerDialog(
+                onDismissRequest = { open = false },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            state.selectedDateMillis?.let { ms ->
+                                onPick(Instant.ofEpochMilli(ms).atZone(ZoneOffset.UTC).toLocalDate())
+                            }
+                            open = false
+                        },
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) { Text(stringResource(R.string.slot_date_ok), color = c.ink, style = CalEventTheme.type.bodyStrong) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { open = false }, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(stringResource(R.string.slot_date_cancel), color = c.ink2, style = CalEventTheme.type.bodyStrong)
+                    }
+                },
+                colors = DatePickerDefaults.colors(containerColor = c.surface),
+            ) {
+                DatePicker(
+                    state = state,
+                    colors = DatePickerDefaults.colors(
+                        containerColor = c.surface,
+                        titleContentColor = c.ink2,
+                        headlineContentColor = c.ink,
+                        weekdayContentColor = c.ink2,
+                        subheadContentColor = c.ink2,
+                        navigationContentColor = c.ink,
+                        yearContentColor = c.ink,
+                        currentYearContentColor = c.ink,
+                        selectedYearContainerColor = c.accent,
+                        selectedYearContentColor = c.onAccent,
+                        dayContentColor = c.ink,
+                        selectedDayContainerColor = c.accent,
+                        selectedDayContentColor = c.onAccent,
+                        todayContentColor = c.ink,
+                        todayDateBorderColor = c.brand,
+                    ),
+                )
+            }
         }
     }
 }

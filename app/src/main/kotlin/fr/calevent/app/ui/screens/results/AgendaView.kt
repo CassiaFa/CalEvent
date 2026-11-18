@@ -35,7 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.calevent.app.R
-import fr.calevent.app.ui.components.SlotCard
+import fr.calevent.app.ui.components.SwipeableSlotCard
 import fr.calevent.app.ui.icons.CalEventIcons
 import fr.calevent.app.ui.theme.CalEventTheme
 import fr.calevent.core.Slot
@@ -62,6 +62,8 @@ internal fun AgendaView(
     onReviewClick: () -> Unit,
     onToggle: (String) -> Unit,
     onOpen: (String) -> Unit,
+    onKeep: (String) -> Unit = {},
+    onIgnore: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var monthMode by rememberSaveable { mutableStateOf(false) }
@@ -110,10 +112,12 @@ internal fun AgendaView(
             }
         } else {
             items(period.slots, key = { it.id }, contentType = { "slot" }) { slot ->
-                SlotCard(
+                SwipeableSlotCard(
                     slot = slot,
                     onToggle = { onToggle(slot.id) },
                     onClick = { onOpen(slot.id) },
+                    onKeep = { onKeep(slot.id) },
+                    onIgnore = { onIgnore(slot.id) },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
