@@ -26,6 +26,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import fr.calevent.app.R
 import fr.calevent.app.ui.icons.CalEventIcons
+import fr.calevent.app.ui.nav.LocalFlowClose
 import fr.calevent.app.ui.theme.CalEventTheme
 
 /**
@@ -46,9 +47,10 @@ fun ScreenScaffold(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val c = CalEventTheme.colors
+    val flowClose = LocalFlowClose.current
     Column(modifier = modifier.fillMaxSize().background(c.bg).imePadding()) {
         Column(Modifier.statusBarsPadding())  {
-            if (title != null || onBack != null || headerActions != null) {
+            if (title != null || onBack != null || headerActions != null || flowClose != null) {
                 Row(
                     modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -65,6 +67,9 @@ fun ScreenScaffold(
                         }
                     }
                     headerActions?.invoke(this)
+                    if (flowClose != null) {
+                        IconActionButton(CalEventIcons.Close, stringResource(R.string.action_close), flowClose)
+                    }
                 }
             }
         }
