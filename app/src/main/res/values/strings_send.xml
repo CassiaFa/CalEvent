@@ -29,4 +29,30 @@
     <string name="success_calendar_period_line">Agenda %1$s · %2$s</string>
     <string name="success_open_calendar">Ouvrir l\'agenda</string>
     <string name="success_back_home">Retour à l\'accueil</string>
+
+    <string name="send_account_davx">DAVx⁵ · %s</string>
+    <string name="send_account_google">Google · %s</string>
+    <string name="send_account_local">Sur ce téléphone</string>
+    <string name="send_loading">Lecture des agendas…</string>
+    <string name="send_sending">Ajout en cours…</string>
+    <string name="send_permission_title">Accès à l\'agenda nécessaire</string>
+    <string name="send_permission_body">CalEvent a besoin d\'accéder à l\'agenda pour vous laisser choisir où ajouter les créneaux et éviter les doublons. Rien ne quitte votre téléphone.</string>
+    <string name="send_permission_blocked_body">L\'accès à l\'agenda est refusé. Vous pouvez l\'autoriser dans les réglages du téléphone, rubrique Autorisations.</string>
+    <string name="send_permission_allow">Autoriser l\'accès à l\'agenda</string>
+    <string name="send_permission_settings">Ouvrir les réglages</string>
+    <string name="send_error_load">Impossible de lire les agendas du téléphone. Réessayez.</string>
+    <string name="send_error_insert">L\'ajout a échoué, aucun créneau n\'a été enregistré. Vos créneaux sont conservés : réessayez.</string>
+    <string name="send_error_undo">L\'annulation a échoué. Vous pouvez supprimer les créneaux directement dans l\'agenda.</string>
+    <string name="send_retry">Réessayer</string>
+    <plurals name="success_failed">
+        <item quantity="one">%d créneau n\'a pas pu être ajouté.</item>
+        <item quantity="other">%d créneaux n\'ont pas pu être ajoutés.</item>
+    </plurals>
+    <string name="success_undo">Annuler l\'ajout</string>
+    <string name="success_undone_headline">Ajout annulé</string>
+    <plurals name="success_undone_detail">
+        <item quantity="one">%1$d créneau supprimé de l\'agenda %2$s</item>
+        <item quantity="other">%1$d créneaux supprimés de l\'agenda %2$s</item>
+    </plurals>
+    <string name="success_no_calendar_app">Aucune application d\'agenda trouvée sur ce téléphone.</string>
 </resources>

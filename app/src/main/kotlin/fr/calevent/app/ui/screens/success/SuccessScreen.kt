@@ -1,5 +1,13 @@
 package fr.calevent.app.ui.screens.success
 
+import android.content.ActivityNotFoundException
+import android.content.ContentUris
+import android.content.Intent
+import android.provider.CalendarContract
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +41,7 @@ import fr.calevent.app.ui.components.BottomActionBar
 import fr.calevent.app.ui.components.PrimaryButton
 import fr.calevent.app.ui.components.ScreenScaffold
 import fr.calevent.app.ui.components.SecondaryButton
+import fr.calevent.app.ui.components.TertiaryButton
 import fr.calevent.app.ui.icons.CalEventIcons
 import fr.calevent.app.ui.screens.send.periodLabel
 import fr.calevent.app.ui.theme.CalEventTheme
@@ -43,25 +52,55 @@ import fr.calevent.core.toCalendarEvent
 @Composable
 fun SuccessScreen(viewModel: ScanViewModel, onDone: () -> Unit) {
     val state by viewModel.uiState.collectAsState()
-    SuccessContent(state, onOpenCalendar = {
-        // wired in milestone 3
-    }, onDone = onDone)
+    val context = LocalContext.current
+    var noCalendarApp by remember { mutableStateOf(false) }
+    SuccessContent(
+        state,
+        onOpenCalendar = {
+            val millis = state.sendResult?.firstStartMillis ?: System.currentTimeMillis()
+            val uri = CalendarContract.CONTENT_URI.buildUpon().appendPath("time").also { ContentUris.appendId(it, millis) }.build()
+            try {
+                context.startActivity(Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            } catch (_: ActivityNotFoundException) {
+                noCalendarApp = true
+            }
+        },
+        onUndo = viewModel::undoSend,
+        onDone = onDone,
+        noCalendarApp = noCalendarApp,
+    )
 }
 
 @Composable
-private fun SuccessContent(state: ScanUiState, onOpenCalendar: () -> Unit, onDone: () -> Unit) {
+private fun SuccessContent(
+    state: ScanUiState,
+    onOpenCalendar: () -> Unit,
+    onDone: () -> Unit,
+    onUndo: () -> Unit = {},
+    noCalendarApp: Boolean = false,
+) {
     val c = CalEventTheme.colors
     val t = CalEventTheme.type
     val plan = state.sendPlan
-    val count = plan.events.size
+    val result = state.sendResult
+    val undone = result?.undone == true
+    val count = result?.createdIds?.size ?: plan.events.size
+    val duplicatesLabel = if (result != null) {
+        if (result.duplicatesIgnored == 0) null else plan.duplicates.label
+    } else plan.duplicates.label
     val period = periodLabel(plan)
-    val calendarName = state.selectedCalendar?.name
+    val calendarName = result?.calendarName ?: state.selectedCalendar?.name
     ScreenScaffold(
         title = stringResource(R.string.success_title),
         bottomBar = {
             BottomActionBar {
-                PrimaryButton(stringResource(R.string.success_open_calendar), onClick = onOpenCalendar, modifier = Modifier.fillMaxWidth())
-                SecondaryButton(stringResource(R.string.success_back_home), onClick = onDone, modifier = Modifier.fillMaxWidth())
+                if (!undone) {
+                    PrimaryButton(stringResource(R.string.success_open_calendar), onClick = onOpenCalendar, modifier = Modifier.fillMaxWidth())
+                    SecondaryButton(stringResource(R.string.success_back_home), onClick = onDone, modifier = Modifier.fillMaxWidth())
+                    if (result != null) TertiaryButton(stringResource(R.string.success_undo), onClick = onUndo, modifier = Modifier.fillMaxWidth())
+                } else {
+                    PrimaryButton(stringResource(R.string.success_back_home), onClick = onDone, modifier = Modifier.fillMaxWidth())
+                }
             }
         },
     ) {
@@ -77,12 +116,13 @@ private fun SuccessContent(state: ScanUiState, onOpenCalendar: () -> Unit, onDon
                 Icon(CalEventIcons.CheckBold, contentDescription = null, tint = c.kept, modifier = Modifier.size(36.dp))
             }
             Text(
-                pluralStringResource(R.plurals.success_headline, count, count),
+                if (undone) stringResource(R.string.success_undone_headline) else pluralStringResource(R.plurals.success_headline, count, count),
                 style = t.title,
                 color = c.ink,
                 textAlign = TextAlign.Center,
             )
             val detail = when {
+                undone -> pluralStringResource(R.plurals.success_undone_detail, count, count, calendarName.orEmpty())
                 calendarName != null && period != null -> stringResource(R.string.success_calendar_period_line, calendarName, period)
                 calendarName != null -> stringResource(R.string.success_calendar_line, calendarName)
                 else -> null
@@ -90,9 +130,14 @@ private fun SuccessContent(state: ScanUiState, onOpenCalendar: () -> Unit, onDon
             if (detail != null) {
                 Text(detail, style = t.body, color = c.ink2, textAlign = TextAlign.Center)
             }
-            plan.duplicates.label?.let {
+            if (!undone) duplicatesLabel?.let {
                 Banner(BannerKind.Info, it, modifier = Modifier.padding(top = 12.dp))
             }
+            if (result != null && result.failedCount > 0 && !undone) {
+                Banner(BannerKind.Error, pluralStringResource(R.plurals.success_failed, result.failedCount, result.failedCount))
+            }
+            if (state.error != null) Banner(BannerKind.Error, stringResource(R.string.send_error_undo))
+            if (noCalendarApp) Banner(BannerKind.Error, stringResource(R.string.success_no_calendar_app))
         }
     }
 }

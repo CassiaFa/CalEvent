@@ -1,12 +1,32 @@
 package fr.calevent.app.ui.screens.preview
 
-import androidx.compose.animation.core.animateFloatAsState
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import fr.calevent.app.capture.CapturedPhoto
+import fr.calevent.app.capture.CapturedPhotoStore
+import fr.calevent.app.capture.CropRect
+import kotlin.math.roundToInt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,7 +42,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -32,7 +51,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -53,7 +71,6 @@ import fr.calevent.app.ui.components.ScreenScaffold
 import fr.calevent.app.ui.icons.CalEventIcons
 import fr.calevent.app.ui.theme.CalEventTheme
 import fr.calevent.app.ui.theme.ThemeMode
-import kotlin.math.min
 
 // Photo backdrop and crop overlay: scene content, so fixed in both themes (same idea as the fake paper).
 private val PhotoBackdrop = Color(0xFF2B241F)
@@ -62,14 +79,15 @@ private val CropVeil = Color(0x59000000)
 private val CropOutline = Color(0xB3FFFFFF)
 
 /**
- * Photo preview before analysis: rotate in quarter turns, toggle a (fake) crop frame, retake, or analyse.
- * Rotation and crop are local UI state only for now.
+ * Photo preview before analysis: shows the real photo from [CapturedPhotoStore], rotate in quarter turns,
+ * crop with four draggable corner handles, retake (deletes the photo) or analyse.
+ * Without a photo in the store (e.g. previews) the fake planning is shown.
  */
 @Composable
 fun PreviewScreen(viewModel: ScanViewModel, onBack: () -> Unit, onNext: () -> Unit) {
     val c = CalEventTheme.colors
     val t = CalEventTheme.type
-    var quarterTurns by rememberSaveable { mutableIntStateOf(0) }
+    val photo by CapturedPhotoStore.photo.collectAsState()
     var cropping by rememberSaveable { mutableStateOf(false) }
     ScreenScaffold(
         title = stringResource(R.string.preview_title),
@@ -85,13 +103,13 @@ fun PreviewScreen(viewModel: ScanViewModel, onBack: () -> Unit, onNext: () -> Un
         },
     ) {
         PhotoViewport(
-            quarterTurns = quarterTurns,
+            photo = photo,
             cropping = cropping,
             modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 8.dp),
         )
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ToolButton(CalEventIcons.RotateLeft, stringResource(R.string.preview_rotate_left), stringResource(R.string.preview_rotate_left_cd), Modifier.weight(1f)) { quarterTurns-- }
-            ToolButton(CalEventIcons.RotateRight, stringResource(R.string.preview_rotate_right), stringResource(R.string.preview_rotate_right_cd), Modifier.weight(1f)) { quarterTurns++ }
+            ToolButton(CalEventIcons.RotateLeft, stringResource(R.string.preview_rotate_left), stringResource(R.string.preview_rotate_left_cd), Modifier.weight(1f)) { CapturedPhotoStore.rotateLeft() }
+            ToolButton(CalEventIcons.RotateRight, stringResource(R.string.preview_rotate_right), stringResource(R.string.preview_rotate_right_cd), Modifier.weight(1f)) { CapturedPhotoStore.rotateRight() }
             ToolButton(
                 CalEventIcons.Crop,
                 stringResource(R.string.preview_crop),
@@ -99,16 +117,29 @@ fun PreviewScreen(viewModel: ScanViewModel, onBack: () -> Unit, onNext: () -> Un
                 Modifier.weight(1f),
                 selected = cropping,
             ) { cropping = !cropping }
-            ToolButton(CalEventIcons.Camera, stringResource(R.string.preview_retake), stringResource(R.string.preview_retake), Modifier.weight(1f), onClick = onBack)
+            ToolButton(CalEventIcons.Camera, stringResource(R.string.preview_retake), stringResource(R.string.preview_retake), Modifier.weight(1f)) {
+                CapturedPhotoStore.clear()
+                onBack()
+            }
         }
     }
 }
 
 @Composable
-private fun PhotoViewport(quarterTurns: Int, cropping: Boolean, modifier: Modifier) {
+private fun PhotoViewport(photo: CapturedPhoto?, cropping: Boolean, modifier: Modifier) {
     val c = CalEventTheme.colors
     val photoCd = stringResource(R.string.preview_photo_cd)
-    val rotation by animateFloatAsState(quarterTurns * 90f, label = "rotation")
+    val context = LocalContext.current
+    // Decode the full (uncropped) photo; the crop is drawn on top and applied later by loadBitmap.
+    var bitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var failed by remember { mutableStateOf(false) }
+    val uri = photo?.uri
+    val turns = photo?.quarterTurns ?: 0
+    LaunchedEffect(uri, turns) {
+        if (uri == null) { bitmap = null; return@LaunchedEffect }
+        failed = false
+        bitmap = runCatching { CapturedPhotoStore.loadBitmap(context, maxSide = 1600, applyCrop = false) }.getOrElse { failed = true; null }
+    }
     BoxWithConstraints(
         modifier
             .clip(RoundedCornerShape(20.dp))
@@ -116,54 +147,75 @@ private fun PhotoViewport(quarterTurns: Int, cropping: Boolean, modifier: Modifi
             .semantics { contentDescription = photoCd },
         contentAlignment = Alignment.Center,
     ) {
-        val paperW = maxWidth - 56.dp
-        val paperH = maxHeight - 52.dp
-        // A quarter turn swaps width and height, so shrink the paper to keep it inside the viewport.
-        val odd = Math.floorMod(quarterTurns, 2) == 1
-        val fit by animateFloatAsState(
-            if (odd) min(maxWidth / paperH, maxHeight / paperW).coerceAtMost(1f) else 1f,
-            label = "fit",
-        )
-        PlanningPhotoPlaceholder(
-            PlanningPhotoVariant.Weekly,
-            Modifier.size(paperW, paperH).graphicsLayer { rotationZ = rotation - 2f; scaleX = fit; scaleY = fit },
-        )
-        if (cropping) CropOverlay(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 18.dp).fillVeil(), c.accent)
+        val bmp = bitmap
+        if (uri == null || failed) {
+            PlanningPhotoPlaceholder(PlanningPhotoVariant.Weekly, Modifier.size(maxWidth - 56.dp, maxHeight - 52.dp))
+        } else if (bmp != null) {
+            val ratio = bmp.width.toFloat() / bmp.height
+            val fit = if (maxWidth / maxHeight > ratio) Modifier.fillMaxHeight().aspectRatio(ratio) else Modifier.fillMaxWidth().aspectRatio(ratio)
+            Box(fit) {
+                Image(bmp.asImageBitmap(), contentDescription = null, contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize())
+                if (cropping) CropOverlay(photo?.crop ?: CropRect.Full, { CapturedPhotoStore.setCrop(it) }, c.accent, Modifier.fillMaxSize())
+                else photo?.crop?.let { CropOverlay(it, {}, c.accent, Modifier.fillMaxSize(), interactive = false) }
+            }
+        }
     }
 }
 
-// Draws the veil around the crop rectangle via a huge outer stroke-less fill, clipped by the viewport.
-private fun Modifier.fillVeil(): Modifier = drawBehind {
-    val pad = Offset(20.dp.toPx(), 18.dp.toPx())
-    // Four rectangles around the crop area.
-    drawRect(CropVeil, Offset(-pad.x, -pad.y), androidx.compose.ui.geometry.Size(size.width + 2 * pad.x, pad.y))
-    drawRect(CropVeil, Offset(-pad.x, size.height), androidx.compose.ui.geometry.Size(size.width + 2 * pad.x, pad.y))
-    drawRect(CropVeil, Offset(-pad.x, 0f), androidx.compose.ui.geometry.Size(pad.x, size.height))
-    drawRect(CropVeil, Offset(size.width, 0f), androidx.compose.ui.geometry.Size(pad.x, size.height))
-}
-
-/** Fake crop frame: thin outline and four amber corner handles (decorative until cropping is wired). */
+/**
+ * Crop rectangle (normalised in the box it fills) with a veil outside and four draggable corner handles.
+ * Each handle has a 44 dp touch target; the rectangle keeps at least 15 % of each side.
+ */
 @Composable
-private fun CropOverlay(modifier: Modifier, handle: Color) {
-    Box(modifier.border(1.5.dp, CropOutline, RoundedCornerShape(4.dp))) {
-        Corner(handle, Alignment.TopStart)
-        Corner(handle, Alignment.TopEnd)
-        Corner(handle, Alignment.BottomStart)
-        Corner(handle, Alignment.BottomEnd)
+private fun CropOverlay(crop: CropRect, onCrop: (CropRect) -> Unit, handle: Color, modifier: Modifier, interactive: Boolean = true) {
+    val density = LocalDensity.current
+    val touch = 44.dp
+    BoxWithConstraints(modifier) {
+        val wPx = with(density) { maxWidth.toPx() }
+        val hPx = with(density) { maxHeight.toPx() }
+        val current by rememberUpdatedState(crop)
+        Box(
+            Modifier.fillMaxSize().drawBehind {
+                val l = current.left * size.width; val t = current.top * size.height
+                val r = current.right * size.width; val b = current.bottom * size.height
+                drawRect(CropVeil, Offset(0f, 0f), Size(size.width, t))
+                drawRect(CropVeil, Offset(0f, b), Size(size.width, size.height - b))
+                drawRect(CropVeil, Offset(0f, t), Size(l, b - t))
+                drawRect(CropVeil, Offset(r, t), Size(size.width - r, b - t))
+                drawRect(CropOutline, Offset(l, t), Size(r - l, b - t), style = Stroke(1.5.dp.toPx()))
+            },
+        )
+        if (!interactive) return@BoxWithConstraints
+        val min = 0.15f
+        fun drag(left: Boolean, top: Boolean, dx: Float, dy: Float) {
+            val cr = current
+            val nx = dx / wPx; val ny = dy / hPx
+            onCrop(
+                CropRect(
+                    left = if (left) (cr.left + nx).coerceIn(0f, cr.right - min) else cr.left,
+                    top = if (top) (cr.top + ny).coerceIn(0f, cr.bottom - min) else cr.top,
+                    right = if (!left) (cr.right + nx).coerceIn(cr.left + min, 1f) else cr.right,
+                    bottom = if (!top) (cr.bottom + ny).coerceIn(cr.top + min, 1f) else cr.bottom,
+                ),
+            )
+        }
+        @Composable
+        fun Handle(left: Boolean, top: Boolean) {
+            val cx = (if (left) crop.left else crop.right) * wPx
+            val cy = (if (top) crop.top else crop.bottom) * hPx
+            val half = with(density) { touch.toPx() / 2 }
+            Box(
+                Modifier
+                    .offset { IntOffset((cx - half).roundToInt(), (cy - half).roundToInt()) }
+                    .size(touch)
+                    .pointerInput(left, top) {
+                        detectDragGestures { change, amount -> change.consume(); drag(left, top, amount.x, amount.y) }
+                    },
+                contentAlignment = Alignment.Center,
+            ) { Box(Modifier.size(22.dp).background(handle, CircleShape)) }
+        }
+        Handle(true, true); Handle(false, true); Handle(true, false); Handle(false, false)
     }
-}
-
-@Composable
-private fun BoxScope.Corner(color: Color, align: Alignment) {
-    Box(Modifier.align(align).size(22.dp).drawBehind {
-        val w = 4.dp.toPx()
-        val right = align == Alignment.TopEnd || align == Alignment.BottomEnd
-        val bottom = align == Alignment.BottomStart || align == Alignment.BottomEnd
-        val x = if (right) size.width - w / 2 else w / 2
-        val y = if (bottom) size.height - w / 2 else w / 2
-        drawLine(color, Offset(x, y), Offset(if (right) 0f else size.width, y), w)
-        drawLine(color, Offset(x, y), Offset(x, if (bottom) 0f else size.height), w)
-    })
 }
 
 @Composable

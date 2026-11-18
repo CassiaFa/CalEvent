@@ -43,7 +43,7 @@ class ShiftCodeTableTest {
     @Test
     fun `absence is just Absence with no detail for any absence code`() {
         val custom = table.add(ShiftCode("AM", "Arrêt maladie", ShiftType.ABSENCE, allDay = true))
-        for (code in listOf("AB", "AM")) {
+        for (code in listOf("AB", "AM", "MAL")) {
             val s = custom.toSlot(code, day, person = "Durand C.")
             assertEquals("Absence", s.title)
             assertTrue(s.allDay)
@@ -82,7 +82,7 @@ class ShiftCodeTableTest {
 
     @Test
     fun `default table matches the mockup`() {
-        assertEquals(listOf("M06", "M07", "S14", "J08", "N08", "RH", "CA", "AB"), table.codes.map { it.code })
+        assertEquals(listOf("M06", "M07", "S14", "J08", "N08", "RH", "CA", "AB", "MAL"), table.codes.map { it.code })
     }
 
     @Test

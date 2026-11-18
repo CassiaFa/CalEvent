@@ -13,6 +13,17 @@
     <string name="camera_import_cd">Importer depuis la galerie</string>
     <string name="camera_shutter_cd">Prendre la photo</string>
 
+    <string name="camera_flash_auto">Flash : automatique</string>
+    <string name="camera_flash_auto_label">Auto</string>
+    <string name="camera_error_capture">La photo n\'a pas pu être prise. Réessayez.</string>
+    <string name="camera_error_import">Cette image n\'a pas pu être importée.</string>
+    <string name="camera_permission_title">Appareil photo non autorisé</string>
+    <string name="camera_permission_body">CalEvent a besoin de l\'appareil photo pour lire votre planning. La photo reste sur ce téléphone.</string>
+    <string name="camera_permission_body_permanent">L\'accès à l\'appareil photo est refusé. Vous pouvez l\'activer dans les réglages du téléphone, ou importer une image.</string>
+    <string name="camera_permission_allow">Autoriser l\'appareil photo</string>
+    <string name="camera_permission_settings">Ouvrir les réglages</string>
+    <string name="camera_permission_import">Importer depuis la galerie</string>
+
     <!-- Preview -->
     <string name="preview_title">Aperçu</string>
     <string name="preview_photo_cd">Photo du planning</string>

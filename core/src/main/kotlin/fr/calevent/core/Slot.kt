@@ -6,6 +6,9 @@ import java.time.LocalTime
 /** Explicit choice made by the user, overriding the computed [SlotStatus]. */
 enum class UserDecision { KEEP, IGNORE }
 
+/** Area of the photo a slot was read from, as fractions (0..1) of the image width and height. */
+data class Region(val left: Double, val top: Double, val right: Double, val bottom: Double)
+
 /** A slot detected on the photographed schedule. Immutable. */
 data class Slot(
     val id: String,
@@ -26,6 +29,8 @@ data class Slot(
     /** French explanation shown to the user, e.g. "Heure de fin incertaine". */
     val reviewReason: String? = null,
     val decision: UserDecision? = null,
+    /** Where the slot was read on the photo, if known. */
+    val region: Region? = null,
 ) {
     init {
         require(confidence in 0.0..1.0) { "confidence must be within 0..1: $confidence" }

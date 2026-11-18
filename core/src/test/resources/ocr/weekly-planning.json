@@ -1,0 +1,23 @@
+{"width":1200,"height":900,"lines":[
+{"text":"Semaine du 16 au 22 novembre 2026","box":[100,40,520,64],"confidence":0.96,"angle":0.4,"elements":[
+  {"text":"Semaine","box":[100,40,190,64],"confidence":0.97},{"text":"du","box":[198,40,222,64],"confidence":0.96},
+  {"text":"16","box":[230,40,256,64],"confidence":0.95},{"text":"au","box":[264,40,288,64],"confidence":0.96},
+  {"text":"22","box":[296,40,322,64],"confidence":0.95},{"text":"novembre","box":[330,40,450,64],"confidence":0.97},
+  {"text":"2026","box":[458,40,520,64],"confidence":0.96}]},
+{"text":"lun. 16","box":[170,100,230,120],"confidence":0.93,"angle":0.3,"elements":[]},
+{"text":"mar. 17","box":[370,101,430,121],"confidence":0.94,"angle":0.3,"elements":[]},
+{"text":"mer. 18","box":[570,101,630,121],"confidence":0.92,"angle":0.4,"elements":[]},
+{"text":"jeu. 19","box":[771,102,829,122],"confidence":0.94,"angle":0.4,"elements":[]},
+{"text":"ven. 20","box":[971,102,1029,122],"confidence":0.93,"angle":0.3,"elements":[]},
+{"text":"8h–12h / 14h–18h","box":[130,150,270,166],"confidence":0.92,"angle":0.4,"elements":[
+  {"text":"8h–12h","box":[130,150,186,166],"confidence":0.92},{"text":"/","box":[192,150,198,166],"confidence":0.88},
+  {"text":"14h–18h","box":[204,150,270,166],"confidence":0.93}]},
+{"text":"Bureau","box":[170,170,230,186],"confidence":0.95,"angle":0.4,"elements":[]},
+{"text":"9h30 Dentiste","box":[345,151,455,167],"confidence":0.94,"angle":0.4,"elements":[
+  {"text":"9h30","box":[345,151,381,167],"confidence":0.93},{"text":"Dentiste","box":[387,151,455,167],"confidence":0.95}]},
+{"text":"Réunion parents","box":[540,151,660,167],"confidence":0.91,"angle":0.4,"elements":[]},
+{"text":"6h3O-14h Inventaire","box":[725,152,875,168],"confidence":0.9,"angle":0.4,"elements":[
+  {"text":"6h3O-14h","box":[725,152,795,168],"confidence":0.88},{"text":"Inventaire","box":[801,152,875,168],"confidence":0.92}]},
+{"text":"20h Cinéma","box":[955,152,1045,168],"confidence":0.95,"angle":0.4,"elements":[]},
+{"text":"8h à","box":[975,200,1010,216],"confidence":0.9,"angle":0.4,"elements":[]}
+]}

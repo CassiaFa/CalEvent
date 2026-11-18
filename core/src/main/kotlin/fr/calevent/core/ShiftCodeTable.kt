@@ -117,6 +117,8 @@ class ShiftCodeTable private constructor(private val entries: Map<String, ShiftC
                 // Leave is not a medical detail: it keeps its own label.
                 ShiftCode("CA", "Congés", ShiftType.REST, allDay = true),
                 ShiftCode("AB", "Absence", ShiftType.ABSENCE, allDay = true),
+                // Sick leave: always shown as a bare "Absence", never the medical code.
+                ShiftCode("MAL", "Absence", ShiftType.ABSENCE, allDay = true),
             ),
         )
     }

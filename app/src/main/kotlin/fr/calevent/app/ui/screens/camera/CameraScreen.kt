@@ -1,5 +1,41 @@
 package fr.calevent.app.ui.screens.camera
 
+import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.Preview as CameraPreview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import fr.calevent.app.capture.CapturedPhotoStore
+import fr.calevent.app.ui.components.PrimaryButton
+import fr.calevent.app.ui.components.SecondaryButton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -58,29 +94,135 @@ private val ViewfinderBg = Color(0xFF0B0F13)
 private val Glass = Color(0x9E0C1014)
 private val OnGlass = Color.White
 
+/** Flash modes cycled by the top-right control. */
+private enum class Flash(val mode: Int, val label: Int, val state: Int) {
+    Auto(ImageCapture.FLASH_MODE_AUTO, R.string.camera_flash_auto_label, R.string.camera_flash_auto),
+    On(ImageCapture.FLASH_MODE_ON, R.string.camera_flash_on_label, R.string.camera_flash_on),
+    Off(ImageCapture.FLASH_MODE_OFF, R.string.camera_flash_off_label, R.string.camera_flash_off),
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
 /**
- * Camera capture. No live feed yet: [PlanningPhotoPlaceholder] stands in for the viewfinder.
- * The shutter goes straight to [onNext]; close goes to [onBack].
+ * Camera capture with a live CameraX preview. The camera permission is requested on arrival (not at launch);
+ * when refused, the screen explains it and the gallery import stays available. The photo goes to
+ * [CapturedPhotoStore] (app cache only) and then [onNext]; close goes to [onBack].
  */
 @Composable
 fun CameraScreen(viewModel: ScanViewModel, onBack: () -> Unit, onNext: () -> Unit) {
-    var flashOn by rememberSaveable { mutableStateOf(false) }
-    Box(Modifier.fillMaxSize().background(ViewfinderBg)) {
-        // Viewfinder stand-in, dimmed like an unlit scene.
-        PlanningPhotoPlaceholder(
-            PlanningPhotoVariant.Weekly,
-            Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(start = 44.dp, end = 44.dp, top = 118.dp).fillMaxWidth().height(420.dp),
+    val context = LocalContext.current
+    val inspection = LocalInspectionMode.current
+    val scope = rememberCoroutineScope()
+    var flash by rememberSaveable { mutableStateOf(Flash.Auto) }
+    var granted by remember { mutableStateOf(inspection || hasCameraPermission(context)) }
+    var asked by rememberSaveable { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val imageCapture = remember { ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY).build() }
+    val errorImport = stringResource(R.string.camera_error_import)
+    val errorCapture = stringResource(R.string.camera_error_capture)
+
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        granted = it
+        asked = true
+    }
+    val pickLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            busy = true
+            scope.launch {
+                val ok = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val target = CapturedPhotoStore.newCaptureFile(context)
+                        context.contentResolver.openInputStream(uri)!!.use { input -> target.outputStream().use { input.copyTo(it) } }
+                        target
+                    }.getOrNull()
+                }
+                busy = false
+                if (ok != null) {
+                    CapturedPhotoStore.set(Uri.fromFile(ok))
+                    onNext()
+                } else error = errorImport
+            }
+        }
+    }
+    val pickImage = { pickLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+
+    LaunchedEffect(Unit) { if (!granted) permissionLauncher.launch(Manifest.permission.CAMERA) }
+    // Coming back from system settings: re-read the permission.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_RESUME && !inspection) granted = hasCameraPermission(context) }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
+    imageCapture.flashMode = flash.mode
+
+    val shoot = shoot@{
+        if (busy) return@shoot
+        busy = true
+        val file = CapturedPhotoStore.newCaptureFile(context)
+        imageCapture.takePicture(
+            ImageCapture.OutputFileOptions.Builder(file).build(),
+            ContextCompat.getMainExecutor(context),
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                    busy = false
+                    CapturedPhotoStore.set(Uri.fromFile(file))
+                    onNext()
+                }
+                override fun onError(exception: ImageCaptureException) {
+                    busy = false
+                    file.delete()
+                    error = errorCapture
+                }
+            },
         )
+    }
+
+    Box(Modifier.fillMaxSize().background(ViewfinderBg)) {
+        if (!granted) {
+            val activity = context.findActivity()
+            // After a refusal, no rationale means "don't ask again" (or a policy block): only settings can help.
+            val permanent = asked && activity != null && !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.CAMERA)
+            PermissionDenied(
+                permanent = permanent,
+                onAllow = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                onSettings = {
+                    context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)))
+                },
+                onImport = pickImage,
+                onClose = onBack,
+            )
+            return@Box
+        }
+        if (inspection) {
+            PlanningPhotoPlaceholder(
+                PlanningPhotoVariant.Weekly,
+                Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(start = 44.dp, end = 44.dp, top = 118.dp).fillMaxWidth().height(420.dp),
+            )
+        } else {
+            LiveViewfinder(imageCapture, Modifier.fillMaxSize())
+        }
         // Guide frame (white corners, 4 dp), drawn around the sheet.
         GuideFrame(Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(start = 28.dp, end = 28.dp, top = 92.dp).fillMaxWidth().height(470.dp))
 
         TopControls(
-            flashOn = flashOn,
-            onFlash = { flashOn = !flashOn },
+            flash = flash,
+            onFlash = { flash = Flash.entries[(flash.ordinal + 1) % Flash.entries.size] },
             onClose = onBack,
             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),
         )
 
+        val message = error
+        if (message != null) {
+            GlassPill(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(start = 20.dp, end = 20.dp, bottom = 210.dp)) {
+                Text(message, style = CalEventTheme.type.secondary.copy(fontSize = 14.sp, fontWeight = FontWeight.Medium), color = OnGlass)
+            }
+        }
         GlassPill(
             Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(start = 20.dp, end = 20.dp, bottom = 150.dp),
         ) {
@@ -93,24 +235,86 @@ fun CameraScreen(viewModel: ScanViewModel, onBack: () -> Unit, onNext: () -> Uni
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             val importCd = stringResource(R.string.camera_import_cd)
-            PlanningPhotoPlaceholder(
-                PlanningPhotoVariant.Weekly,
+            Box(
                 Modifier
                     .size(52.dp)
                     .clip(RoundedCornerShape(14.dp))
+                    .background(Glass, RoundedCornerShape(14.dp))
                     .border(2.dp, OnGlass.copy(alpha = 0.85f), RoundedCornerShape(14.dp))
-                    .clickable(role = Role.Button, onClick = onNext)
+                    .clickable(role = Role.Button, onClick = pickImage)
                     .semantics { contentDescription = importCd },
-            )
-            Shutter(onClick = onNext)
+                contentAlignment = Alignment.Center,
+            ) { Icon(CalEventIcons.Gallery, contentDescription = null, tint = OnGlass, modifier = Modifier.size(26.dp)) }
+            Shutter(onClick = { shoot() })
             // Balances the row so the shutter stays centred.
             Box(Modifier.size(52.dp))
         }
     }
 }
 
+private fun hasCameraPermission(context: Context) =
+    ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+
+/** CameraX preview bound to the lifecycle; [imageCapture] is bound with it. */
 @Composable
-private fun TopControls(flashOn: Boolean, onFlash: () -> Unit, onClose: () -> Unit, modifier: Modifier = Modifier) {
+private fun LiveViewfinder(imageCapture: ImageCapture, modifier: Modifier) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val previewView = remember {
+        PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER; implementationMode = PreviewView.ImplementationMode.COMPATIBLE }
+    }
+    DisposableEffect(lifecycleOwner) {
+        val future = ProcessCameraProvider.getInstance(context)
+        var provider: ProcessCameraProvider? = null
+        future.addListener({
+            val p = future.get()
+            provider = p
+            val preview = CameraPreview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
+            runCatching {
+                p.unbindAll()
+                p.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
+            }
+        }, ContextCompat.getMainExecutor(context))
+        onDispose { provider?.unbindAll() }
+    }
+    AndroidView(factory = { previewView }, modifier = modifier)
+}
+
+/** Shown when the camera permission is missing: explanation, retry or settings, and gallery import. */
+@Composable
+private fun PermissionDenied(permanent: Boolean, onAllow: () -> Unit, onSettings: () -> Unit, onImport: () -> Unit, onClose: () -> Unit) {
+    val t = CalEventTheme.type
+    val closeCd = stringResource(R.string.camera_close_cd)
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier.statusBarsPadding().padding(16.dp).size(44.dp).clip(CircleShape).background(Glass, CircleShape).clickable(role = Role.Button, onClick = onClose),
+            contentAlignment = Alignment.Center,
+        ) { Icon(CalEventIcons.Close, contentDescription = closeCd, tint = OnGlass, modifier = Modifier.size(22.dp)) }
+        Column(
+            Modifier.align(Alignment.Center).padding(horizontal = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Icon(CalEventIcons.Camera, contentDescription = null, tint = OnGlass, modifier = Modifier.size(48.dp))
+            Text(stringResource(R.string.camera_permission_title), style = t.section, color = OnGlass, textAlign = TextAlign.Center)
+            Text(
+                stringResource(if (permanent) R.string.camera_permission_body_permanent else R.string.camera_permission_body),
+                style = t.body, color = OnGlass.copy(alpha = 0.85f), textAlign = TextAlign.Center,
+            )
+        }
+        Column(
+            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 20.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (permanent) PrimaryButton(stringResource(R.string.camera_permission_settings), onClick = onSettings, modifier = Modifier.fillMaxWidth())
+            else PrimaryButton(stringResource(R.string.camera_permission_allow), onClick = onAllow, modifier = Modifier.fillMaxWidth())
+            SecondaryButton(stringResource(R.string.camera_permission_import), onClick = onImport, icon = CalEventIcons.Gallery, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+@Composable
+private fun TopControls(flash: Flash, onFlash: () -> Unit, onClose: () -> Unit, modifier: Modifier = Modifier) {
     val t = CalEventTheme.type
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
         val closeCd = stringResource(R.string.camera_close_cd)
@@ -124,7 +328,7 @@ private fun TopControls(flashOn: Boolean, onFlash: () -> Unit, onClose: () -> Un
             Text(stringResource(R.string.camera_offline), style = t.chip.copy(fontSize = 13.sp), color = OnGlass)
         }
 
-        val flashState = stringResource(if (flashOn) R.string.camera_flash_on else R.string.camera_flash_off)
+        val flashState = stringResource(flash.state)
         val flashCd = stringResource(R.string.camera_flash_toggle_cd, flashState)
         Row(
             Modifier
@@ -138,7 +342,7 @@ private fun TopControls(flashOn: Boolean, onFlash: () -> Unit, onClose: () -> Un
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Icon(CalEventIcons.Flash, contentDescription = null, tint = OnGlass, modifier = Modifier.size(22.dp))
-            Text(stringResource(if (flashOn) R.string.camera_flash_on_label else R.string.camera_flash_off_label), style = t.chip.copy(fontSize = 14.sp), color = OnGlass)
+            Text(stringResource(flash.label), style = t.chip.copy(fontSize = 14.sp), color = OnGlass)
         }
     }
 }
