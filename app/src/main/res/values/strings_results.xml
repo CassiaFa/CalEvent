@@ -106,4 +106,22 @@
     <string name="slot_time_duration">Durée %1$d h %2$02d</string>
     <string name="slot_time_duration_next_day">Durée %1$d h %2$02d (+1 j)</string>
     <string name="slot_time_validate">Valider %1$s</string>
+    <string name="results_people_label">Personnes</string>
+    <string name="results_people_none_selected">Aucune sélectionnée</string>
+    <string name="results_people_change">Choisir</string>
+    <string name="results_people_close">Fermer</string>
+    <string name="results_people_me_section">Moi</string>
+    <string name="results_people_me_badge">Moi</string>
+    <string name="results_people_all_section">Tout le planning · %1$d</string>
+    <string name="results_people_its_me">C\'est moi</string>
+    <string name="results_people_not_me">Ce n\'est pas moi</string>
+    <string name="results_people_choose_first">Choisissez d\'abord une personne</string>
+    <plurals name="results_people_shifts">
+        <item quantity="one">%1$d créneau</item>
+        <item quantity="other">%1$d créneaux</item>
+    </plurals>
+    <plurals name="results_people_prompt_hint">
+        <item quantity="one">Ce tableau contient %1$d personne. Choisissez-la pour voir ses créneaux. Si vous indiquez « C\'est moi », ce choix sera retenu la prochaine fois.</item>
+        <item quantity="other">Ce tableau contient %1$d personnes. Choisissez-en une pour voir ses créneaux. Si vous indiquez « C\'est moi », ce choix sera retenu la prochaine fois.</item>
+    </plurals>
 </resources>

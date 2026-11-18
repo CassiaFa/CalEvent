@@ -13,6 +13,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
+import fr.calevent.app.ui.components.PrimaryButton
+import fr.calevent.app.ui.components.SecondaryButton
+import fr.calevent.app.ui.components.TertiaryButton
+import fr.calevent.app.ui.components.IconActionButton
+import fr.calevent.core.sameName
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,7 +52,7 @@ import java.text.Normalizer
 private fun String.foldKey(): String =
     Normalizer.normalize(this, Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "").lowercase().trim()
 
-/** Row under the warnings: shows the chosen person (or asks to choose one); opens the picker. */
+/** Row under the warnings (6a/6c): shows the chosen person (or "Aucune sélectionnée"); opens the picker. */
 @Composable
 internal fun PersonRow(selected: String?, onClick: () -> Unit) {
     val c = CalEventTheme.colors
@@ -49,48 +60,75 @@ internal fun PersonRow(selected: String?, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = 52.dp)
+            .heightIn(min = 56.dp)
             .background(c.surface2, shape)
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 14.dp),
+            .padding(horizontal = 14.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Icon(CalEventIcons.Person, contentDescription = null, tint = c.ink, modifier = Modifier.size(22.dp))
-        Text(
-            if (selected == null) stringResource(R.string.results_people_choose) else stringResource(R.string.results_people_selected, selected),
-            style = CalEventTheme.type.bodyStrong,
-            color = c.ink,
-            modifier = Modifier.weight(1f),
-        )
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.results_people_label), style = CalEventTheme.type.secondary, color = c.ink2)
+            Text(
+                selected ?: stringResource(R.string.results_people_none_selected),
+                style = CalEventTheme.type.bodyStrong,
+                color = c.ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Text(stringResource(R.string.results_people_change), style = CalEventTheme.type.bodyStrong, color = c.ink)
         Icon(CalEventIcons.Search, contentDescription = null, tint = c.ink2, modifier = Modifier.size(20.dp))
     }
 }
 
-/** Shown instead of the slots while nobody is chosen on a team schedule. */
+/** Shown instead of the slots while nobody is chosen on a team schedule (6a). */
 @Composable
-internal fun PersonPrompt() {
+internal fun PersonPrompt(peopleCount: Int, onChoose: () -> Unit) {
     val c = CalEventTheme.colors
     Column(
         Modifier.fillMaxSize().padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
     ) {
-        Text(stringResource(R.string.results_people_prompt), style = CalEventTheme.type.bodyStrong, color = c.ink, textAlign = TextAlign.Center)
-        Text(stringResource(R.string.results_people_prompt_hint), style = CalEventTheme.type.secondary, color = c.ink2, textAlign = TextAlign.Center)
+        Icon(CalEventIcons.Person, contentDescription = null, tint = c.ink2, modifier = Modifier.size(32.dp))
+        Text(stringResource(R.string.results_people_prompt), style = CalEventTheme.type.section, color = c.ink, textAlign = TextAlign.Center)
+        Text(
+            pluralStringResource(R.plurals.results_people_prompt_hint, peopleCount, peopleCount),
+            style = CalEventTheme.type.secondary,
+            color = c.ink2,
+            textAlign = TextAlign.Center,
+        )
+        SecondaryButton(stringResource(R.string.results_people_choose), onClick = onChoose, modifier = Modifier.fillMaxWidth())
     }
 }
 
-/** Minimal person picker: search field and the list of names; the full team screen comes later. */
+private fun initials(name: String): String =
+    name.split(' ', '.', '-').filter { it.isNotBlank() }.take(2).joinToString("") { it.first().uppercase() }
+
+/**
+ * Person picker (6b): search, the stored "Moi" first, then everyone with their number of shifts.
+ * [onSetMe] stores (or, with null, clears) the "Moi" name.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun PersonSheet(people: List<String>, selected: String?, onSelect: (String?) -> Unit, onDismiss: () -> Unit) {
+internal fun PersonSheet(
+    people: List<String>,
+    counts: Map<String, Int>,
+    selected: String?,
+    me: String?,
+    onSelect: (String?) -> Unit,
+    onSetMe: (String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
     val c = CalEventTheme.colors
     var query by remember { mutableStateOf("") }
-    val shown = remember(people, query) {
-        val key = query.foldKey()
-        if (key.isEmpty()) people else people.filter { it.foldKey().contains(key) }
-    }
+    val key = query.foldKey()
+    val matching = remember(people, key) { if (key.isEmpty()) people else people.filter { it.foldKey().contains(key) } }
+    val meName = people.firstOrNull { sameName(it, me) }
+    val mine = matching.filter { it == meName }
+    val others = matching.filter { it != meName }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -101,16 +139,31 @@ internal fun PersonSheet(people: List<String>, selected: String?, onSelect: (Str
         dragHandle = { BottomSheetDefaults.DragHandle(color = c.line) },
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(stringResource(R.string.results_people_sheet_title), style = CalEventTheme.type.section, color = c.ink)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.results_people_sheet_title), style = CalEventTheme.type.section, color = c.ink, modifier = Modifier.weight(1f))
+                IconActionButton(CalEventIcons.Close, stringResource(R.string.results_people_close), onClick = onDismiss)
+            }
             LabeledField(stringResource(R.string.results_people_search), query, { query = it })
             LazyColumn(Modifier.weight(1f, fill = false).heightIn(max = 420.dp)) {
-                if (selected != null) {
-                    item { PersonItem(stringResource(R.string.results_people_clear), false) { onSelect(null) } }
+                if (mine.isNotEmpty()) {
+                    item { SectionTitle(stringResource(R.string.results_people_me_section)) }
+                    items(mine) { name -> PersonItem(name, counts[name], name == selected, isMe = true) { onSelect(name) } }
                 }
-                items(shown) { name -> PersonItem(name, name == selected) { onSelect(name) } }
-                if (shown.isEmpty()) {
+                if (others.isNotEmpty()) {
+                    item { SectionTitle(stringResource(R.string.results_people_all_section, people.size)) }
+                    items(others) { name -> PersonItem(name, counts[name], name == selected, isMe = false) { onSelect(name) } }
+                }
+                if (matching.isEmpty()) {
                     item { Text(stringResource(R.string.results_people_none_found), style = CalEventTheme.type.secondary, color = c.ink2, modifier = Modifier.padding(vertical = 12.dp)) }
                 }
+            }
+            if (selected != null) {
+                if (sameName(selected, me)) {
+                    TertiaryButton(stringResource(R.string.results_people_not_me), onClick = { onSetMe(null) }, modifier = Modifier.fillMaxWidth())
+                } else {
+                    PrimaryButton(stringResource(R.string.results_people_its_me), onClick = { onSetMe(selected) }, modifier = Modifier.fillMaxWidth())
+                }
+                TertiaryButton(stringResource(R.string.results_people_clear), onClick = { onSelect(null) }, modifier = Modifier.fillMaxWidth())
             }
             Box(Modifier.size(12.dp))
         }
@@ -118,14 +171,39 @@ internal fun PersonSheet(people: List<String>, selected: String?, onSelect: (Str
 }
 
 @Composable
-private fun PersonItem(label: String, checked: Boolean, onClick: () -> Unit) {
+private fun SectionTitle(text: String) {
+    Text(text.uppercase(), style = CalEventTheme.type.label, color = CalEventTheme.colors.ink2, modifier = Modifier.padding(top = 12.dp, bottom = 2.dp))
+}
+
+@Composable
+private fun PersonItem(name: String, count: Int?, checked: Boolean, isMe: Boolean, onClick: () -> Unit) {
     val c = CalEventTheme.colors
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Button, onClick = onClick),
+        Modifier.fillMaxWidth().heightIn(min = 52.dp).selectable(selected = checked, role = Role.RadioButton, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(label, style = CalEventTheme.type.body, color = c.ink, modifier = Modifier.weight(1f))
-        if (checked) Icon(CalEventIcons.Check, contentDescription = null, tint = c.kept, modifier = Modifier.size(22.dp))
+        Box(Modifier.size(34.dp).background(c.surface2, RoundedCornerShape(17.dp)), contentAlignment = Alignment.Center) {
+            Text(initials(name), style = CalEventTheme.type.chip.copy(fontWeight = FontWeight.Bold), color = c.ink2)
+        }
+        Column(Modifier.weight(1f)) {
+            Text(name, style = CalEventTheme.type.bodyStrong, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (count != null) {
+                Text(pluralStringResource(R.plurals.results_people_shifts, count, count), style = CalEventTheme.type.secondary, color = c.ink2)
+            }
+        }
+        if (isMe) {
+            Text(
+                stringResource(R.string.results_people_me_badge),
+                style = CalEventTheme.type.chip,
+                color = c.kept,
+                modifier = Modifier.background(c.keptBg, RoundedCornerShape(999.dp)).padding(horizontal = 10.dp, vertical = 4.dp),
+            )
+        }
+        RadioButton(
+            selected = checked,
+            onClick = null,
+            colors = RadioButtonDefaults.colors(selectedColor = c.ink, unselectedColor = c.ink2),
+        )
     }
 }

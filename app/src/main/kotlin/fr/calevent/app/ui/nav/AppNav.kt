@@ -137,6 +137,7 @@ fun AppNav(
                 onBack = back,
                 onNext = { navController.navigate(Routes.Send) },
                 onDefineCode = openCodes,
+                onSetMe = { scope.launch { settingsRepository.setMe(it) } },
                 onReanalyze = { navController.navigate(Routes.Analysis) { popUpTo(Routes.Results) { inclusive = true } } },
             )
             }

@@ -27,7 +27,9 @@ import fr.calevent.core.CalendarEvent
 import fr.calevent.core.SendPlan
 import fr.calevent.core.Slot
 import fr.calevent.core.UserDecision
+import fr.calevent.core.SlotMemory
 import fr.calevent.core.SlotSummary
+import fr.calevent.core.findPerson
 import fr.calevent.core.displaySlots
 import fr.calevent.core.toCalendarEvent
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -93,6 +95,10 @@ data class ScanUiState(
     val kindLabel: String? = null,
     /** People of a team schedule, in the order of the photo; empty otherwise. */
     val people: List<String> = emptyList(),
+    /** Number of shifts of each person of a team schedule (shown in the person picker). */
+    val peopleCounts: Map<String, Int> = emptyMap(),
+    /** Name stored as "Moi" in the settings, if any. */
+    val me: String? = null,
     /** Person chosen on a team schedule; null (the default) means nobody, hence no slots. */
     val selectedPerson: String? = null,
     /** Réglages › Ignorer les doublons: when false, existing events are not compared. */
@@ -128,6 +134,9 @@ class ScanViewModel : ViewModel() {
     private var analysisJob: Job? = null
     private val analyzer = ScanAnalyzer()
     private var codes: ShiftCodeTable = ShiftCodeTable.default()
+
+    /** Decisions and edits per slot for the whole scan session (kept when switching person). */
+    private var memory = SlotMemory()
 
     private val _photoBitmap = MutableStateFlow<Bitmap?>(null)
 
@@ -167,6 +176,7 @@ class ScanViewModel : ViewModel() {
             val changed = new.defaultCalendarId != old.defaultCalendarId || new.alwaysAskCalendar != old.alwaysAskCalendar
             s.copy(
                 skipDuplicates = new.skipDuplicates,
+                me = new.me,
                 selectedCalendarId = if (preferred != null && (changed || s.selectedCalendarId == null)) preferred else s.selectedCalendarId,
             )
         }
@@ -179,6 +189,7 @@ class ScanViewModel : ViewModel() {
      */
     fun applyCodeTable(table: ShiftCodeTable) {
         if (table == codes) return
+        captureCurrent()
         codes = table
         val before = _uiState.value.slots
         val after = table.resolveUnknownCodes(before)
@@ -301,11 +312,12 @@ class ScanViewModel : ViewModel() {
      */
     fun startAnalysis(context: Context) {
         analysisJob?.cancel()
+        memory = SlotMemory()
         val app = context.applicationContext
         _uiState.update {
             it.copy(
                 analysis = AnalysisState.Running(AnalysisStep.DETECT), slots = emptyList(), parse = null, warnings = emptyList(),
-                kindLabel = null, people = emptyList(), selectedPerson = null, sendResult = null, error = null, existingEvents = emptyList(),
+                kindLabel = null, people = emptyList(), peopleCounts = emptyMap(), selectedPerson = null, sendResult = null, error = null, existingEvents = emptyList(),
             )
         }
         analysisJob = viewModelScope.launch {
@@ -316,14 +328,17 @@ class ScanViewModel : ViewModel() {
                 val result = out.result
                 _photoBitmap.value = out.bitmap
                 val failed = ParseWarning.NO_SLOTS in result.warnings
+                val team = result.kind.isTeam
+                val preselected = if (team) findPerson(result.people, settings.me) else null
                 _uiState.update {
                     it.copy(
                         parse = result,
                         warnings = result.warnings,
                         kindLabel = result.kind.label,
-                        people = if (result.kind.isTeam) result.people else emptyList(),
-                        selectedPerson = null,
-                        slots = if (result.kind.isTeam) emptyList() else result.slots,
+                        people = if (team) result.people else emptyList(),
+                        peopleCounts = if (team) result.people.associateWith { p -> result.slotsFor(p, codes).size } else emptyMap(),
+                        selectedPerson = preselected,
+                        slots = if (team) result.slotsFor(preselected, codes) else result.slots,
                         analysis = if (failed) AnalysisState.Failed(AnalysisFailure.NO_SLOTS, textRead = out.lineCount > 0) else AnalysisState.Done,
                     )
                 }
@@ -351,11 +366,25 @@ class ScanViewModel : ViewModel() {
         } else if (clockwise) CapturedPhotoStore.rotateRight() else CapturedPhotoStore.rotateLeft()
     }
 
-    /** Chooses (or clears with null) the person of a team schedule; their slots replace the current ones. */
-    fun selectPerson(name: String?) = _uiState.update { s ->
-        val parse = s.parse ?: return@update s
-        s.copy(selectedPerson = name, slots = parse.slotsFor(name, codes), sendResult = null, error = null, existingEvents = emptyList())
-    }.also { loadExistingIfReady() }
+    /**
+     * Chooses (or clears with null) the person of a team schedule; their slots replace the current ones.
+     * Decisions and edits made on the previous person are remembered and restored when coming back.
+     */
+    fun selectPerson(name: String?) {
+        val parse = _uiState.value.parse ?: return
+        captureCurrent()
+        val slots = memory.restore(parse.slotsFor(name, codes))
+        _uiState.update { it.copy(selectedPerson = name, slots = slots, sendResult = null, error = null, existingEvents = emptyList()) }
+        loadExistingIfReady()
+    }
+
+    /** Remembers what the user changed on the slots currently shown (team schedules only). */
+    private fun captureCurrent() {
+        val s = _uiState.value
+        val parse = s.parse ?: return
+        val person = s.selectedPerson ?: return
+        memory = memory.capture(parse.slotsFor(person, codes), s.slots)
+    }
 
     private fun loadExistingIfReady() {
         if (_uiState.value.calendarAccess == CalendarAccess.GRANTED && _uiState.value.selectedCalendarId != null) loadExisting()

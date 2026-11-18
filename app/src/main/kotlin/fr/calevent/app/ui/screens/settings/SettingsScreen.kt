@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -75,6 +76,7 @@ fun SettingsScreen(
     val codeTable by repository.codeTable.collectAsState(initial = null)
     var refresh by remember { mutableStateOf(0) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var editingMe by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         // Lists calendars if the permission is already granted; never asks for it here.
         viewModel.attach(context)
@@ -95,6 +97,16 @@ fun SettingsScreen(
             onDismiss = { confirmDelete = false },
         )
     }
+    if (editingMe) {
+        EditMeDialog(
+            current = settings.me,
+            onSave = { name ->
+                editingMe = false
+                scope.launch { repository.setMe(name) }
+            },
+            onDismiss = { editingMe = false },
+        )
+    }
     SettingsContent(
         calendarName = calendarName,
         me = settings.me,
@@ -104,6 +116,7 @@ fun SettingsScreen(
         onBack = onBack,
         onOpenCalendar = onOpenCalendar,
         onOpenCodes = onOpenCodes,
+        onEditMe = { editingMe = true },
         onTheme = { scope.launch { repository.setTheme(it) } },
         onOpenPrivacy = onOpenPrivacy,
         onDeletePhotos = { confirmDelete = true },
@@ -122,6 +135,7 @@ internal fun SettingsContent(
     onBack: () -> Unit,
     onOpenCalendar: () -> Unit,
     onOpenCodes: () -> Unit,
+    onEditMe: () -> Unit,
     onTheme: (ThemeMode) -> Unit,
     onOpenPrivacy: () -> Unit,
     onDeletePhotos: () -> Unit,
@@ -139,8 +153,7 @@ internal fun SettingsContent(
                 SettingsGroup {
                     SettingsRow(stringResource(R.string.settings_default_calendar), value = calendarName, onClick = onOpenCalendar)
                     RowDivider()
-                    // Team schedules are not built yet: the row is shown but not active.
-                    SettingsRow(stringResource(R.string.settings_me), value = me ?: stringResource(R.string.settings_soon), enabled = false, onClick = {})
+                    SettingsRow(stringResource(R.string.settings_me), value = me ?: stringResource(R.string.settings_me_unset), onClick = onEditMe)
                     RowDivider()
                     SettingsRow(
                         stringResource(R.string.settings_codes),
@@ -203,6 +216,41 @@ internal fun SettingsContent(
     }
 }
 
+/** Edit or clear the "Moi" name used to preselect the person in team schedules. */
+@Composable
+internal fun EditMeDialog(current: String?, onSave: (String?) -> Unit, onDismiss: () -> Unit) {
+    val c = CalEventTheme.colors
+    var name by remember { mutableStateOf(current.orEmpty()) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.surface,
+        title = { Text(stringResource(R.string.settings_me_title), style = CalEventTheme.type.section, color = c.ink) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(stringResource(R.string.settings_me_hint), style = CalEventTheme.type.body, color = c.ink2)
+                fr.calevent.app.ui.components.LabeledField(stringResource(R.string.settings_me_field), name, { name = it })
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = { onSave(name.trim().ifEmpty { null }) }, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text(stringResource(R.string.settings_me_save), color = c.ink)
+            }
+        },
+        dismissButton = {
+            Row {
+                if (current != null) {
+                    androidx.compose.material3.TextButton(onClick = { onSave(null) }, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(stringResource(R.string.settings_me_clear), color = c.danger)
+                    }
+                }
+                androidx.compose.material3.TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text(stringResource(R.string.settings_cancel), color = c.ink)
+                }
+            }
+        },
+    )
+}
+
 /** Confirmation before deleting every stored photo. */
 @Composable
 internal fun DeletePhotosDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
@@ -223,7 +271,7 @@ internal fun DeletePhotosDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 
 @Composable
 private fun PreviewContent(mode: ThemeMode) = CalEventTheme(mode) {
-    SettingsContent("Travail", null, 9, mode, "4 · 6,2 Mo", {}, {}, {}, {}, {}, {}, {}, {})
+    SettingsContent("Travail", "Durand C.", 9, mode, "4 · 6,2 Mo", {}, {}, {}, {}, {}, {}, {}, {}, {})
 }
 
 @Preview(widthDp = 390, heightDp = 844)

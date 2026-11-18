@@ -17,12 +17,10 @@
     <string name="results_turn_half">Retourner</string>
     <string name="results_turn_half_cd">Retourner la photo d\'un demi-tour</string>
     <string name="results_people_choose">Choisir une personne</string>
-    <string name="results_people_selected">Personne : %1$s</string>
     <string name="results_people_sheet_title">Personnes</string>
     <string name="results_people_search">Rechercher un nom</string>
     <string name="results_people_none_found">Aucun nom ne correspond.</string>
     <string name="results_people_prompt">Choisissez une personne pour voir ses créneaux</string>
-    <string name="results_people_prompt_hint">Aucun créneau n\'est ajouté tant que personne n\'est choisi.</string>
     <string name="results_people_clear">Aucune personne</string>
     <string name="results_photo_cd">Photo du planning avec les zones détectées</string>
     <string name="results_photo_no_zone">Certains créneaux n\'ont pas de zone sur la photo.</string>

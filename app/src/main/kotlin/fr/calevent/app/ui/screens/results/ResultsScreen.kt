@@ -73,6 +73,7 @@ fun ResultsScreen(
     onNext: () -> Unit,
     onReanalyze: () -> Unit = {},
     onDefineCode: (String) -> Unit = {},
+    onSetMe: (String?) -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsState()
     val photo by viewModel.photoBitmap.collectAsState()
@@ -90,6 +91,7 @@ fun ResultsScreen(
         },
         onSelectPerson = viewModel::selectPerson,
         onDefineCode = onDefineCode,
+        onSetMe = onSetMe,
         photo = photo,
     )
 }
@@ -107,6 +109,7 @@ internal fun ResultsContent(
     onSelectPerson: (String?) -> Unit = {},
     onSetDecision: (String, UserDecision?) -> Unit = { _, _ -> },
     onDefineCode: (String) -> Unit = {},
+    onSetMe: (String?) -> Unit = {},
     photo: Bitmap? = null,
     initialTab: Int = 0,
 ) {
@@ -161,7 +164,7 @@ internal fun ResultsContent(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Text(
-                        stringResource(R.string.results_add_hint),
+                        stringResource(if (state.needsPerson) R.string.results_people_choose_first else R.string.results_add_hint),
                         style = CalEventTheme.type.secondary.copy(fontSize = 13.sp),
                         color = CalEventTheme.colors.ink2,
                         modifier = Modifier.fillMaxWidth(),
@@ -212,7 +215,7 @@ internal fun ResultsContent(
         Box(Modifier.weight(1f).fillMaxWidth().padding(top = 12.dp)) {
             val firstReview = state.visibleSlots.firstOrNull { it.status == SlotStatus.TO_REVIEW }
             if (state.needsPerson) {
-                PersonPrompt()
+                PersonPrompt(state.people.size, onChoose = { pickingPerson = true })
             } else if (tab == 0) {
                 AgendaView(
                     slots = state.visibleSlots,
@@ -251,7 +254,10 @@ internal fun ResultsContent(
     if (pickingPerson) {
         PersonSheet(
             people = state.people,
+            counts = state.peopleCounts,
             selected = state.selectedPerson,
+            me = state.me,
+            onSetMe = onSetMe,
             onSelect = { onSelectPerson(it); pickingPerson = false },
             onDismiss = { pickingPerson = false },
         )
