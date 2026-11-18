@@ -43,7 +43,7 @@ fun AppNav(navController: NavHostController = rememberNavController()) {
             HomeScreen(
                 viewModel = viewModel,
                 onTakePhoto = { navController.navigate(Routes.Camera) },
-                onImport = { navController.navigate(Routes.Preview) },
+                onImport = { navController.navigate(Routes.Preview) }, // called once the picked photo is imported
                 onOpenSettings = { navController.navigate(Routes.Settings) },
                 onOpenRecent = { navController.navigate(Routes.Results) },
                 onSeeAll = { /* No history screen yet. */ },
@@ -51,8 +51,23 @@ fun AppNav(navController: NavHostController = rememberNavController()) {
         }
         composable(Routes.Camera) { CameraScreen(viewModel, onBack = back, onNext = { navController.navigate(Routes.Preview) }) }
         composable(Routes.Preview) { PreviewScreen(viewModel, onBack = back, onNext = { navController.navigate(Routes.Analysis) }) }
-        composable(Routes.Analysis) { AnalysisScreen(viewModel, onBack = back, onNext = { navController.navigate(Routes.Results) }) }
-        composable(Routes.Results) { ResultsScreen(viewModel, onBack = back, onNext = { navController.navigate(Routes.Send) }) }
+        composable(Routes.Analysis) {
+            AnalysisScreen(
+                viewModel,
+                onBack = back,
+                // Results replace the analysis: going back from them returns to the preview, not to a new analysis.
+                onNext = { navController.navigate(Routes.Results) { popUpTo(Routes.Analysis) { inclusive = true } } },
+                onRetake = { if (!navController.popBackStack(Routes.Camera, false)) navController.navigate(Routes.Camera) },
+            )
+        }
+        composable(Routes.Results) {
+            ResultsScreen(
+                viewModel,
+                onBack = back,
+                onNext = { navController.navigate(Routes.Send) },
+                onReanalyze = { navController.navigate(Routes.Analysis) { popUpTo(Routes.Results) { inclusive = true } } },
+            )
+        }
         composable(Routes.Send) { SendScreen(viewModel, onBack = back, onNext = { navController.navigate(Routes.Success) }) }
         composable(Routes.Success) {
             SuccessScreen(viewModel, onDone = {

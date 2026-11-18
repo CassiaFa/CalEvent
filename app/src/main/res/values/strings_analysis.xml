@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="analysis_none_title">Aucun créneau trouvé</string>
+    <string name="analysis_none_body">Ni date ni horaire n\'ont pu être lus sur cette photo.</string>
+    <string name="analysis_error_title">La lecture a échoué</string>
+    <string name="analysis_error_body">La photo n\'a pas pu être lue. Reprenez-la ou choisissez une autre image.</string>
+    <string name="analysis_tips_title">Pour la prochaine photo</string>
+    <string name="analysis_tip_flat">Posez le planning à plat</string>
+    <string name="analysis_tip_light">Bonne lumière, sans reflet</string>
+    <string name="analysis_tip_whole">Tout le tableau, en-têtes compris</string>
+    <string name="analysis_tip_close">Rapprochez-vous si l\'écriture est petite</string>
+    <string name="analysis_retake">Reprendre la photo</string>
+    <string name="analysis_pick_other">Choisir une autre image</string>
+    <string name="analysis_view_anyway">Voir quand même</string>
+
+    <string name="results_upside_down_warning">La photo semble à l\'envers</string>
+    <string name="results_turn_half">Retourner</string>
+    <string name="results_turn_half_cd">Retourner la photo d\'un demi-tour</string>
+    <string name="results_people_choose">Choisir une personne</string>
+    <string name="results_people_selected">Personne : %1$s</string>
+    <string name="results_people_sheet_title">Personnes</string>
+    <string name="results_people_search">Rechercher un nom</string>
+    <string name="results_people_none_found">Aucun nom ne correspond.</string>
+    <string name="results_people_prompt">Choisissez une personne pour voir ses créneaux</string>
+    <string name="results_people_prompt_hint">Aucun créneau n\'est ajouté tant que personne n\'est choisi.</string>
+    <string name="results_people_clear">Aucune personne</string>
+    <string name="results_photo_cd">Photo du planning avec les zones détectées</string>
+    <string name="results_photo_no_zone">Certains créneaux n\'ont pas de zone sur la photo.</string>
+    <string name="slot_crop_cd">Extrait de la photo autour du créneau</string>
+    <string name="home_import_error">Cette image n\'a pas pu être importée.</string>
+</resources>

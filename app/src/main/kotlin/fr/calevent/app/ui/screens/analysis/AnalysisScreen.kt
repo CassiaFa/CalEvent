@@ -66,43 +66,89 @@ import fr.calevent.app.ui.components.SecondaryButton
 import fr.calevent.app.ui.icons.CalEventIcons
 import fr.calevent.app.ui.theme.CalEventTheme
 import fr.calevent.app.ui.theme.ThemeMode
-import kotlinx.coroutines.delay
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalContext
+import fr.calevent.app.capture.rememberGalleryImporter
+import fr.calevent.app.ui.AnalysisFailure
+import fr.calevent.app.ui.AnalysisState
+import fr.calevent.app.ui.components.Banner
+import fr.calevent.app.ui.components.BannerKind
+import fr.calevent.app.ui.components.PrimaryButton
+import fr.calevent.app.ui.components.TertiaryButton
 
 private const val STEP_COUNT = 3
 
-// Simulated work: three steps of 1.1 s each (3.3 s total, inside the 2 to 5 s range), then a short pause.
-private const val STEP_MILLIS = 1100L
-private const val FINISH_PAUSE_MILLIS = 300L
+// Duration of the progress bar animation between two steps.
+private const val STEP_MILLIS = 600
 
 // Photo backdrop: scene content, fixed in both themes.
 private val PhotoBackdrop = Color(0xFF2B241F)
 
 /**
- * Recognition in progress (simulated): Detection, Reading, Structuring, then [onNext] by itself.
- * Cancel goes back. [viewModel] is unused until the real pipeline is wired.
+ * Recognition in progress: Detection, Reading, Structuring, driven by the real pipeline
+ * ([ScanViewModel.startAnalysis]); [onNext] when done. Cancel stops the analysis and goes back.
+ * When nothing is found (or reading fails) the "no slot found" state replaces the progress.
+ *
+ * @param onRetake back to the camera.
  */
 @Composable
-fun AnalysisScreen(viewModel: ScanViewModel, onBack: () -> Unit, onNext: () -> Unit) {
-    // Index of the running step; STEP_COUNT means everything is done.
-    var step by remember { mutableIntStateOf(0) }
-    val currentOnNext by rememberUpdatedState(onNext)
+fun AnalysisScreen(viewModel: ScanViewModel, onBack: () -> Unit, onNext: () -> Unit, onRetake: () -> Unit = {}) {
+    val context = LocalContext.current
+    val state by viewModel.uiState.collectAsState()
+    // Survives rotation of the phone so that the analysis is not restarted.
+    var started by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        for (i in 0 until STEP_COUNT) {
-            step = i
-            delay(STEP_MILLIS)
+        if (!started) {
+            started = true
+            viewModel.startAnalysis(context)
         }
-        step = STEP_COUNT
-        delay(FINISH_PAUSE_MILLIS)
-        currentOnNext()
     }
-    AnalysisContent(step = step, onCancel = onBack)
+    val currentOnNext by rememberUpdatedState(onNext)
+    val analysis = state.analysis
+    LaunchedEffect(analysis) { if (analysis is AnalysisState.Done) currentOnNext() }
+
+    BackHandler(enabled = analysis is AnalysisState.Running) {
+        viewModel.cancelAnalysis()
+        onBack()
+    }
+
+    var importError by remember { mutableStateOf(false) }
+    val importer = rememberGalleryImporter(
+        onImported = { started = true; viewModel.startAnalysis(context) },
+        onError = { importError = true },
+    )
+    when (analysis) {
+        is AnalysisState.Failed -> NoSlotsContent(
+            failure = analysis.reason,
+            canViewAnyway = analysis.textRead,
+            importError = importError,
+            onRetake = onRetake,
+            onPickOther = importer::launch,
+            onViewAnyway = onNext,
+            onBack = onBack,
+        )
+        else -> AnalysisContent(
+            step = when (analysis) {
+                is AnalysisState.Running -> analysis.step
+                is AnalysisState.Done -> STEP_COUNT
+                else -> 0
+            },
+            onCancel = {
+                viewModel.cancelAnalysis()
+                onBack()
+            },
+        )
+    }
 }
 
 @Composable
 private fun AnalysisContent(step: Int, onCancel: () -> Unit) {
     val c = CalEventTheme.colors
     val t = CalEventTheme.type
-    val progress by animateFloatAsState(step / STEP_COUNT.toFloat() + if (step < STEP_COUNT) 0.5f / STEP_COUNT else 0f, tween(STEP_MILLIS.toInt()), label = "progress")
+    val progress by animateFloatAsState(step / STEP_COUNT.toFloat() + if (step < STEP_COUNT) 0.5f / STEP_COUNT else 0f, tween(STEP_MILLIS), label = "progress")
     val headline = stringResource(
         when (step) {
             0 -> R.string.analysis_headline_detect
@@ -252,6 +298,75 @@ private fun ScanningPhoto(running: Boolean) {
     }
 }
 
+/** "No slot found" state (also used when reading failed): tips to retake the photo, and the way out. */
+@Composable
+private fun NoSlotsContent(
+    failure: AnalysisFailure,
+    canViewAnyway: Boolean,
+    importError: Boolean,
+    onRetake: () -> Unit,
+    onPickOther: () -> Unit,
+    onViewAnyway: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val c = CalEventTheme.colors
+    val t = CalEventTheme.type
+    ScreenScaffold(
+        onBack = onBack,
+        bottomBar = {
+            BottomActionBar {
+                PrimaryButton(stringResource(R.string.analysis_retake), onClick = onRetake, icon = CalEventIcons.Camera, modifier = Modifier.fillMaxWidth())
+                SecondaryButton(stringResource(R.string.analysis_pick_other), onClick = onPickOther, icon = CalEventIcons.Gallery, modifier = Modifier.fillMaxWidth())
+                if (canViewAnyway) TertiaryButton(stringResource(R.string.analysis_view_anyway), onClick = onViewAnyway, modifier = Modifier.fillMaxWidth())
+            }
+        },
+    ) {
+        Column(
+            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            Box(Modifier.size(72.dp).background(c.surface2, CircleShape), contentAlignment = Alignment.Center) {
+                Icon(CalEventIcons.Search, contentDescription = null, tint = c.ink2, modifier = Modifier.size(32.dp))
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    stringResource(if (failure == AnalysisFailure.NO_SLOTS) R.string.analysis_none_title else R.string.analysis_error_title),
+                    style = t.section.copy(fontSize = 22.sp, lineHeight = 27.sp),
+                    color = c.ink,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.semantics { heading() },
+                )
+                Text(
+                    stringResource(if (failure == AnalysisFailure.NO_SLOTS) R.string.analysis_none_body else R.string.analysis_error_body),
+                    style = t.secondary,
+                    color = c.ink2,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            if (importError) Banner(BannerKind.Error, stringResource(R.string.home_import_error))
+            Column(Modifier.fillMaxWidth().background(c.surface, RoundedCornerShape(16.dp)).border(1.dp, c.line, RoundedCornerShape(16.dp)).padding(vertical = 4.dp)) {
+                Text(
+                    stringResource(R.string.analysis_tips_title).uppercase(),
+                    style = t.label,
+                    color = c.ink2,
+                    modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
+                )
+                listOf(R.string.analysis_tip_flat, R.string.analysis_tip_light, R.string.analysis_tip_whole, R.string.analysis_tip_close).forEach { tip ->
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Icon(CalEventIcons.Check, contentDescription = null, tint = c.kept, modifier = Modifier.size(20.dp))
+                        Text(stringResource(tip), style = t.body, color = c.ink)
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Preview(widthDp = 390, heightDp = 844)
 @Composable
 private fun AnalysisScreenLightPreview() = CalEventTheme(ThemeMode.LIGHT) { AnalysisContent(step = 1, onCancel = {}) }
@@ -259,3 +374,11 @@ private fun AnalysisScreenLightPreview() = CalEventTheme(ThemeMode.LIGHT) { Anal
 @Preview(widthDp = 390, heightDp = 844)
 @Composable
 private fun AnalysisScreenDarkPreview() = CalEventTheme(ThemeMode.DARK) { AnalysisContent(step = 1, onCancel = {}) }
+
+@Preview(widthDp = 390, heightDp = 844)
+@Composable
+private fun NoSlotsPreview() = CalEventTheme(ThemeMode.LIGHT) { NoSlotsContent(AnalysisFailure.NO_SLOTS, true, false, {}, {}, {}, {}) }
+
+@Preview(widthDp = 390, heightDp = 844)
+@Composable
+private fun NoSlotsDarkPreview() = CalEventTheme(ThemeMode.DARK) { NoSlotsContent(AnalysisFailure.NO_SLOTS, false, false, {}, {}, {}, {}) }

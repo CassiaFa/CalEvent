@@ -1,5 +1,7 @@
 package fr.calevent.app.ui.screens.results
 
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -8,7 +10,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,6 +31,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -82,7 +89,11 @@ private fun zoneEndInset(index: Int): Dp = (index % 4 * 8).dp
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun PhotoView(slots: List<Slot>, onOpen: (String) -> Unit, modifier: Modifier = Modifier) {
+internal fun PhotoView(slots: List<Slot>, onOpen: (String) -> Unit, modifier: Modifier = Modifier, photo: Bitmap? = null) {
+    if (photo != null) {
+        RealPhotoView(photo, slots, onOpen, modifier)
+        return
+    }
     val ordered = remember(slots) { slots.sortedWith(compareBy<Slot> { it.date }.thenBy { it.start }.thenBy { it.id }) }
     val sheetHeight = PAPER_TOP * 2 + ROW_PITCH * ordered.size.coerceAtLeast(6)
     Column(
@@ -190,4 +201,101 @@ private fun Modifier.dashedBorder(color: Color, width: Dp): Modifier = drawBehin
         cornerRadius = CornerRadius(6.dp.toPx()),
         style = Stroke(w, pathEffect = PathEffect.dashPathEffect(floatArrayOf(w * 3, w * 2.5f))),
     )
+}
+
+/** Smallest touch target, also for tiny zones (a cell of a 31-day schedule). */
+private val MIN_TOUCH = 44.dp
+
+/**
+ * The real photo with each slot's [Slot.region] laid over it. A zone is its status as outline style
+ * (solid / dashed), a light tint and a badge icon; its touch area is at least 44 dp.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RealPhotoView(photo: Bitmap, slots: List<Slot>, onOpen: (String) -> Unit, modifier: Modifier) {
+    val image = remember(photo) { photo.asImageBitmap() }
+    val withZone = slots.filter { it.region != null }
+    val photoCd = stringResource(R.string.results_photo_cd)
+    Column(
+        modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        BoxWithConstraints(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(ScenePaper.Table)) {
+            val w = maxWidth
+            val h = w * photo.height / photo.width
+            Box(Modifier.fillMaxWidth().height(h)) {
+                Image(
+                    bitmap = image,
+                    contentDescription = photoCd,
+                    contentScale = ContentScale.FillBounds,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                withZone.forEach { slot ->
+                    val r = slot.region!!
+                    val zoneW = w * (r.right - r.left).toFloat()
+                    val zoneH = h * (r.bottom - r.top).toFloat()
+                    val touchW = maxOf(zoneW, MIN_TOUCH)
+                    val touchH = maxOf(zoneH, MIN_TOUCH)
+                    val cx = w * ((r.left + r.right) / 2).toFloat()
+                    val cy = h * ((r.top + r.bottom) / 2).toFloat()
+                    PhotoZone(
+                        slot = slot,
+                        zoneWidth = zoneW,
+                        zoneHeight = zoneH,
+                        onClick = { onOpen(slot.id) },
+                        modifier = Modifier
+                            .offset(x = (cx - touchW / 2).coerceIn(0.dp, (w - touchW).coerceAtLeast(0.dp)), y = (cy - touchH / 2).coerceIn(0.dp, (h - touchH).coerceAtLeast(0.dp)))
+                            .size(touchW, touchH),
+                    )
+                }
+            }
+        }
+        Text(stringResource(R.string.results_photo_hint), style = CalEventTheme.type.secondary, color = CalEventTheme.colors.ink2)
+        if (withZone.size < slots.size) {
+            Text(stringResource(R.string.results_photo_no_zone), style = CalEventTheme.type.secondary, color = CalEventTheme.colors.ink2)
+        }
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            StatusChip(SlotStatus.KEPT)
+            StatusChip(SlotStatus.TO_REVIEW)
+            StatusChip(SlotStatus.IGNORED)
+        }
+    }
+}
+
+@Composable
+private fun PhotoZone(slot: Slot, zoneWidth: Dp, zoneHeight: Dp, onClick: () -> Unit, modifier: Modifier) {
+    val c = CalEventTheme.colors
+    val (fg, tint, icon) = when (slot.status) {
+        SlotStatus.KEPT -> Triple(c.kept, c.keptBg, CalEventIcons.Check)
+        SlotStatus.TO_REVIEW -> Triple(c.review, c.reviewBg, CalEventIcons.Warning)
+        SlotStatus.IGNORED -> Triple(c.ignored, c.ignoredBg, CalEventIcons.EyeOff)
+    }
+    val statusLabel = stringResource(
+        when (slot.status) {
+            SlotStatus.KEPT -> R.string.status_kept
+            SlotStatus.TO_REVIEW -> R.string.status_review
+            SlotStatus.IGNORED -> R.string.status_ignored
+        },
+    )
+    val description = stringResource(R.string.results_zone_cd, statusLabel, slot.date.format(DAY_FORMAT) + " " + slotTimeText(slot), slot.title)
+    val shape = RoundedCornerShape(4.dp)
+    Box(
+        modifier.clickable(role = Role.Button, onClick = onClick).semantics(mergeDescendants = true) { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .size(zoneWidth, zoneHeight)
+                // Light tint so the paper stays readable under the zone.
+                .background(tint.copy(alpha = 0.35f), shape)
+                .then(if (slot.status == SlotStatus.KEPT) Modifier.border(2.dp, fg, shape) else Modifier.dashedBorder(fg, 2.dp)),
+        )
+        // Status badge: icon on a theme surface so that it reads on any paper colour.
+        Box(
+            Modifier.align(Alignment.TopEnd).size(18.dp).background(c.surface, CircleShape).border(1.dp, fg, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(12.dp))
+        }
+    }
 }

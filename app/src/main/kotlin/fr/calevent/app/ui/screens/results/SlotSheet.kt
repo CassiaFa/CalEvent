@@ -1,5 +1,7 @@
 package fr.calevent.app.ui.screens.results
 
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -8,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -28,7 +31,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -50,6 +56,7 @@ import fr.calevent.app.ui.components.ToggleRow
 import fr.calevent.app.ui.icons.CalEventIcons
 import fr.calevent.app.ui.theme.CalEventTheme
 import fr.calevent.app.ui.theme.ThemeMode
+import fr.calevent.core.Region
 import fr.calevent.core.Slot
 import fr.calevent.core.SlotStatus
 import java.time.LocalDate
@@ -75,7 +82,7 @@ private fun parseDate(text: String): LocalDate? = runCatching { LocalDate.parse(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun SlotSheet(slot: Slot, onDismiss: () -> Unit, onUpdate: (Slot) -> Unit) {
+internal fun SlotSheet(slot: Slot, onDismiss: () -> Unit, onUpdate: (Slot) -> Unit, photo: Bitmap? = null) {
     val c = CalEventTheme.colors
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
@@ -87,13 +94,13 @@ internal fun SlotSheet(slot: Slot, onDismiss: () -> Unit, onUpdate: (Slot) -> Un
         scrimColor = c.scrim,
         dragHandle = { BottomSheetDefaults.DragHandle(color = c.line) },
     ) {
-        SlotSheetContent(slot = slot, onUpdate = onUpdate, onClose = onDismiss)
+        SlotSheetContent(slot = slot, onUpdate = onUpdate, onClose = onDismiss, photo = photo)
     }
 }
 
 /** Content of the sheet, separate from the Material container so that it can be previewed. */
 @Composable
-internal fun SlotSheetContent(slot: Slot, onUpdate: (Slot) -> Unit, onClose: () -> Unit) {
+internal fun SlotSheetContent(slot: Slot, onUpdate: (Slot) -> Unit, onClose: () -> Unit, photo: Bitmap? = null) {
     val c = CalEventTheme.colors
     // Text being typed lives here; the slot is only replaced when the text is valid.
     var title by remember(slot.id) { mutableStateOf(slot.title) }
@@ -129,7 +136,7 @@ internal fun SlotSheetContent(slot: Slot, onUpdate: (Slot) -> Unit, onClose: () 
             Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(top = 6.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            SourceCrop(slot)
+            SourceCrop(slot, photo)
             if (status != SlotStatus.KEPT && slot.reviewReason != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(CalEventIcons.Warning, contentDescription = null, tint = c.review, modifier = Modifier.size(18.dp))
@@ -211,7 +218,7 @@ private fun FieldError(text: String) {
 
 /** Fake cropped extract of the photo around the slot, with the text read there. */
 @Composable
-private fun SourceCrop(slot: Slot) {
+private fun SourceCrop(slot: Slot, photo: Bitmap?) {
     val c = CalEventTheme.colors
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
@@ -219,7 +226,19 @@ private fun SourceCrop(slot: Slot) {
             style = CalEventTheme.type.label.copy(fontSize = 12.sp),
             color = c.ink2,
         )
-        Box(
+        val crop = remember(photo, slot.region) { cropAround(photo, slot.region) }
+        if (crop != null) {
+            val cropCd = stringResource(R.string.slot_crop_cd)
+            Image(
+                bitmap = remember(crop) { crop.asImageBitmap() },
+                contentDescription = cropCd,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp, max = 120.dp).clip(RoundedCornerShape(12.dp)).border(1.dp, ScenePaper.Rule, RoundedCornerShape(12.dp)),
+            )
+            if (slot.sourceText.isNotBlank()) {
+                Text(slot.sourceText, style = CalEventTheme.type.secondary, color = c.ink2)
+            }
+        } else Box(
             Modifier
                 .fillMaxWidth()
                 .height(64.dp)
@@ -245,6 +264,18 @@ private fun SourceCrop(slot: Slot) {
             )
         }
     }
+}
+
+/** The part of [photo] around [region] (with a small margin), or null when either is missing. */
+private fun cropAround(photo: Bitmap?, region: Region?): Bitmap? {
+    if (photo == null || region == null) return null
+    val marginX = (region.right - region.left) * 0.15 + 0.005
+    val marginY = (region.bottom - region.top) * 0.4 + 0.005
+    val x = ((region.left - marginX).coerceAtLeast(0.0) * photo.width).toInt().coerceIn(0, photo.width - 1)
+    val y = ((region.top - marginY).coerceAtLeast(0.0) * photo.height).toInt().coerceIn(0, photo.height - 1)
+    val right = ((region.right + marginX).coerceAtMost(1.0) * photo.width).toInt().coerceIn(x + 1, photo.width)
+    val bottom = ((region.bottom + marginY).coerceAtMost(1.0) * photo.height).toInt().coerceIn(y + 1, photo.height)
+    return runCatching { Bitmap.createBitmap(photo, x, y, right - x, bottom - y) }.getOrNull()
 }
 
 /** Dashed outline around the text that raised doubts (style, not colour alone: it is also written below). */

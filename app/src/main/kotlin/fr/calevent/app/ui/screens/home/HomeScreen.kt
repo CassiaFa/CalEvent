@@ -20,6 +20,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import fr.calevent.app.capture.rememberGalleryImporter
+import fr.calevent.app.ui.components.Banner
+import fr.calevent.app.ui.components.BannerKind
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,7 +61,7 @@ import java.util.Locale
  * Home: brand row, offline badge, pitch, recent plannings, and the two capture actions at the bottom.
  * This is the reference screen for the others: ScreenScaffold + BottomActionBar + theme tokens only.
  *
- * @param onTakePhoto start the camera. @param onImport pick a photo from the gallery.
+ * @param onTakePhoto start the camera. @param onImport the gallery photo was picked and imported: go on to the preview.
  * @param onOpenSettings open settings. @param onOpenRecent open a recent planning (its id).
  * @param onSeeAll "Tout voir" link of the recent list.
  */
@@ -70,6 +75,9 @@ fun HomeScreen(
     onSeeAll: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
+    var importError by remember { mutableStateOf(false) }
+    // "Importer" opens the system photo picker; onImport runs once the photo is the current one.
+    val importer = rememberGalleryImporter(onImported = { importError = false; onImport() }, onError = { importError = true })
     val c = CalEventTheme.colors
     val t = CalEventTheme.type
     ScreenScaffold(
@@ -84,7 +92,8 @@ fun HomeScreen(
                 )
                 SecondaryButton(
                     text = stringResource(R.string.home_import),
-                    onClick = onImport,
+                    onClick = importer::launch,
+                    enabled = !importer.busy,
                     icon = CalEventIcons.Gallery,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -102,6 +111,7 @@ fun HomeScreen(
                 }
                 IconActionButton(CalEventIcons.Settings, stringResource(R.string.action_settings), onOpenSettings)
             }
+            if (importError) Banner(BannerKind.Error, stringResource(R.string.home_import_error))
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OfflineBadge()
                 Text(stringResource(R.string.home_title), style = t.title, color = c.ink)

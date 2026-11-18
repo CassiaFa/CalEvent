@@ -6,8 +6,17 @@ import androidx.lifecycle.viewModelScope
 import fr.calevent.app.calendar.CalendarRepository
 import fr.calevent.app.calendar.ContentResolverCalendarRepository
 import fr.calevent.app.calendar.FakeCalendarRepository
+import android.graphics.Bitmap
+import fr.calevent.app.analysis.AnalysisStep
+import fr.calevent.app.analysis.ScanAnalyzer
+import fr.calevent.app.capture.CapturedPhotoStore
+import fr.calevent.core.ShiftCodeTable
+import fr.calevent.core.parse.ParseResult
+import fr.calevent.core.parse.ParseWarning
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import java.time.ZoneId
 import fr.calevent.app.data.DeviceCalendar
 import fr.calevent.app.data.FakeData
@@ -27,6 +36,21 @@ import kotlinx.coroutines.flow.update
 enum class CalendarAccess { UNKNOWN, GRANTED, DENIED, BLOCKED }
 
 enum class SendError { LOAD_CALENDARS, INSERT }
+
+/** Why the analysis ended without usable slots. */
+enum class AnalysisFailure { NO_SLOTS, ERROR }
+
+/** Progress of the photo analysis (see [ScanViewModel.startAnalysis]). */
+sealed interface AnalysisState {
+    data object Idle : AnalysisState
+
+    /** [step] is an [AnalysisStep] constant. */
+    data class Running(val step: Int) : AnalysisState
+    data object Done : AnalysisState
+
+    /** [textRead]: some text was recognized, so "Voir quand même" makes sense. */
+    data class Failed(val reason: AnalysisFailure, val textRead: Boolean) : AnalysisState
+}
 
 /** What was written, kept for the success screen and for "Annuler l'ajout". */
 data class SendResult(
@@ -57,7 +81,21 @@ data class ScanUiState(
     val error: SendError? = null,
     /** Set once events were written; read by the success screen. */
     val sendResult: SendResult? = null,
+    val analysis: AnalysisState = AnalysisState.Idle,
+    /** Parser output of the current photo; null for fake data. */
+    val parse: ParseResult? = null,
+    /** Problems noticed while reading the photo (rotation, blur, tilt...). */
+    val warnings: List<ParseWarning> = emptyList(),
+    /** Title of the detected kind of schedule, e.g. "Calendrier mural". */
+    val kindLabel: String? = null,
+    /** People of a team schedule, in the order of the photo; empty otherwise. */
+    val people: List<String> = emptyList(),
+    /** Person chosen on a team schedule; null (the default) means nobody, hence no slots. */
+    val selectedPerson: String? = null,
 ) {
+    /** True when a person must be chosen to see slots. */
+    val needsPerson: Boolean = people.isNotEmpty() && selectedPerson == null
+
     /** Count per status ("12 retenus · 3 à revoir"). */
     val summary: SlotSummary = SlotSummary.of(slots)
 
@@ -79,6 +117,14 @@ class ScanViewModel : ViewModel() {
     private var repository: CalendarRepository = FakeCalendarRepository()
     private var prefs: android.content.SharedPreferences? = null
     private var existingJob: Job? = null
+    private var analysisJob: Job? = null
+    private val analyzer = ScanAnalyzer()
+    private var codes: ShiftCodeTable = ShiftCodeTable.default()
+
+    private val _photoBitmap = MutableStateFlow<Bitmap?>(null)
+
+    /** Image the current slots were read on (their regions are fractions of it); null with fake data. */
+    val photoBitmap: StateFlow<Bitmap?> = _photoBitmap.asStateFlow()
 
     private val _uiState = MutableStateFlow(
         ScanUiState(
@@ -204,6 +250,72 @@ class ScanViewModel : ViewModel() {
                 if (ok) it.copy(sendResult = result.copy(undone = true), error = null) else it.copy(error = SendError.INSERT)
             }
         }
+    }
+
+    /**
+     * Reads the current photo ([CapturedPhotoStore]) on a background thread and fills the state
+     * (slots, warnings, people). Replaces any analysis in progress. Observe [ScanUiState.analysis].
+     */
+    fun startAnalysis(context: Context) {
+        analysisJob?.cancel()
+        val app = context.applicationContext
+        _uiState.update {
+            it.copy(
+                analysis = AnalysisState.Running(AnalysisStep.DETECT), slots = emptyList(), parse = null, warnings = emptyList(),
+                kindLabel = null, people = emptyList(), selectedPerson = null, sendResult = null, error = null, existingEvents = emptyList(),
+            )
+        }
+        analysisJob = viewModelScope.launch {
+            try {
+                val out = analyzer.analyze(app, codes, LocalDate.now()) { step ->
+                    _uiState.update { if (it.analysis is AnalysisState.Running) it.copy(analysis = AnalysisState.Running(step)) else it }
+                }
+                val result = out.result
+                _photoBitmap.value = out.bitmap
+                val failed = ParseWarning.NO_SLOTS in result.warnings
+                _uiState.update {
+                    it.copy(
+                        parse = result,
+                        warnings = result.warnings,
+                        kindLabel = result.kind.label,
+                        people = if (result.kind.isTeam) result.people else emptyList(),
+                        selectedPerson = null,
+                        slots = if (result.kind.isTeam) emptyList() else result.slots,
+                        analysis = if (failed) AnalysisState.Failed(AnalysisFailure.NO_SLOTS, textRead = out.lineCount > 0) else AnalysisState.Done,
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.update { it.copy(analysis = AnalysisState.Failed(AnalysisFailure.ERROR, textRead = false)) }
+            }
+        }
+    }
+
+    /** Stops the analysis in progress (Cancel button). */
+    fun cancelAnalysis() {
+        analysisJob?.cancel()
+        _uiState.update { if (it.analysis is AnalysisState.Running) it.copy(analysis = AnalysisState.Idle) else it }
+    }
+
+    /**
+     * Turns the photo by a quarter turn (clockwise when [clockwise]) or a half turn ([halfTurn]);
+     * the caller then restarts the analysis.
+     */
+    fun rotatePhoto(clockwise: Boolean, halfTurn: Boolean = false) {
+        if (halfTurn) {
+            CapturedPhotoStore.rotateRight(); CapturedPhotoStore.rotateRight()
+        } else if (clockwise) CapturedPhotoStore.rotateRight() else CapturedPhotoStore.rotateLeft()
+    }
+
+    /** Chooses (or clears with null) the person of a team schedule; their slots replace the current ones. */
+    fun selectPerson(name: String?) = _uiState.update { s ->
+        val parse = s.parse ?: return@update s
+        s.copy(selectedPerson = name, slots = parse.slotsFor(name, codes), sendResult = null, error = null, existingEvents = emptyList())
+    }.also { loadExistingIfReady() }
+
+    private fun loadExistingIfReady() {
+        if (_uiState.value.calendarAccess == CalendarAccess.GRANTED && _uiState.value.selectedCalendarId != null) loadExisting()
     }
 
     fun clearError() = _uiState.update { it.copy(error = null) }

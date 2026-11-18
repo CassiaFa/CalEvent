@@ -1,5 +1,6 @@
 package fr.calevent.app.ui.screens.results
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -44,23 +45,25 @@ import fr.calevent.app.ui.icons.CalEventIcons
 import fr.calevent.app.ui.theme.CalEventTheme
 import fr.calevent.app.ui.theme.ThemeMode
 import fr.calevent.core.Slot
+import fr.calevent.core.parse.ParseWarning
 import fr.calevent.core.SlotStatus
 import fr.calevent.core.rangeLabel
 
 /**
- * Results: header, Agenda / Photo switch, status counters, the slot list (or the photo with zones)
- * and the "add N slots" bar. Tapping a slot opens [SlotSheet].
+ * Results: header, warnings, person picker (team schedules), Agenda / Photo switch, status counters,
+ * the slot list (or the photo with zones) and the "add N slots" bar. Tapping a slot opens [SlotSheet].
  *
- * @param showRotationWarning shows the "photo turned a quarter" banner (orientation detection is not wired yet).
+ * @param onReanalyze called after the photo was turned (Pivoter): the analysis must run again.
  */
 @Composable
 fun ResultsScreen(
     viewModel: ScanViewModel,
     onBack: () -> Unit,
     onNext: () -> Unit,
-    showRotationWarning: Boolean = false,
+    onReanalyze: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsState()
+    val photo by viewModel.photoBitmap.collectAsState()
     ResultsContent(
         state = state,
         onBack = onBack,
@@ -68,7 +71,12 @@ fun ResultsScreen(
         onToggle = viewModel::toggleSlot,
         onUpdate = viewModel::updateSlot,
         onShowIgnored = viewModel::setShowIgnored,
-        showRotationWarning = showRotationWarning,
+        onRotate = { clockwise, half ->
+            viewModel.rotatePhoto(clockwise, half)
+            onReanalyze()
+        },
+        onSelectPerson = viewModel::selectPerson,
+        photo = photo,
     )
 }
 
@@ -81,12 +89,14 @@ internal fun ResultsContent(
     onToggle: (String) -> Unit,
     onUpdate: (Slot) -> Unit,
     onShowIgnored: (Boolean) -> Unit,
-    showRotationWarning: Boolean,
+    onRotate: (clockwise: Boolean, halfTurn: Boolean) -> Unit,
+    onSelectPerson: (String?) -> Unit = {},
+    photo: Bitmap? = null,
     initialTab: Int = 0,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(initialTab) }
     var openId by rememberSaveable { mutableStateOf<String?>(null) }
-    var rotationDismissed by rememberSaveable { mutableStateOf(false) }
+    var pickingPerson by rememberSaveable { mutableStateOf(false) }
     val summary = state.summary
     val slots = state.slots
     val first = slots.minOfOrNull { it.date }
@@ -102,7 +112,7 @@ internal fun ResultsContent(
     }
 
     ScreenScaffold(
-        title = stringResource(R.string.results_title),
+        title = state.kindLabel ?: stringResource(R.string.results_title),
         onBack = onBack,
         bottomBar = {
             BottomActionBar {
@@ -135,8 +145,9 @@ internal fun ResultsContent(
             if (subtitle.isNotEmpty()) {
                 Text(subtitle, style = CalEventTheme.type.secondary, color = CalEventTheme.colors.ink2)
             }
-            if (showRotationWarning && !rotationDismissed) {
-                RotationBanner(onRotate = { rotationDismissed = true })
+            state.warnings.forEach { WarningBanner(it, onRotate) }
+            if (state.people.isNotEmpty()) {
+                PersonRow(state.selectedPerson, onClick = { pickingPerson = true })
             }
             SegmentedControl(
                 options = listOf(
@@ -156,7 +167,9 @@ internal fun ResultsContent(
         }
         Box(Modifier.weight(1f).fillMaxWidth().padding(top = 12.dp)) {
             val firstReview = state.visibleSlots.firstOrNull { it.status == SlotStatus.TO_REVIEW }
-            if (tab == 0) {
+            if (state.needsPerson) {
+                PersonPrompt()
+            } else if (tab == 0) {
                 AgendaView(
                     slots = state.visibleSlots,
                     reviewCount = summary.toReview,
@@ -165,7 +178,7 @@ internal fun ResultsContent(
                     onOpen = { openId = it },
                 )
             } else {
-                PhotoView(slots = state.visibleSlots, onOpen = { openId = it })
+                PhotoView(slots = state.visibleSlots, onOpen = { openId = it }, photo = photo)
             }
         }
     }
@@ -176,12 +189,45 @@ internal fun ResultsContent(
             slot = openSlot,
             onDismiss = { openId = null },
             onUpdate = onUpdate,
+            photo = photo,
+        )
+    }
+    if (pickingPerson) {
+        PersonSheet(
+            people = state.people,
+            selected = state.selectedPerson,
+            onSelect = { onSelectPerson(it); pickingPerson = false },
+            onDismiss = { pickingPerson = false },
         )
     }
 }
 
 @Composable
-private fun RotationBanner(onRotate: () -> Unit) {
+private fun WarningBanner(warning: ParseWarning, onRotate: (clockwise: Boolean, halfTurn: Boolean) -> Unit) {
+    when (warning) {
+        ParseWarning.ROTATED_QUARTER_TURN -> RotationBanner(onRotate)
+        ParseWarning.UPSIDE_DOWN -> {
+            val cd = stringResource(R.string.results_turn_half_cd)
+            Banner(
+                kind = BannerKind.Review,
+                text = stringResource(R.string.results_upside_down_warning),
+                actions = {
+                    SecondaryButton(
+                        stringResource(R.string.results_turn_half),
+                        onClick = { onRotate(true, true) },
+                        compact = true,
+                        modifier = Modifier.semantics { contentDescription = cd },
+                    )
+                },
+            )
+        }
+        ParseWarning.NO_SLOTS -> Banner(BannerKind.Error, warning.message)
+        ParseWarning.TILTED, ParseWarning.LOW_TEXT -> Banner(BannerKind.Review, warning.message)
+    }
+}
+
+@Composable
+private fun RotationBanner(onRotate: (clockwise: Boolean, halfTurn: Boolean) -> Unit) {
     val left = stringResource(R.string.results_rotate_left_cd)
     val right = stringResource(R.string.results_rotate_right_cd)
     Banner(
@@ -190,13 +236,13 @@ private fun RotationBanner(onRotate: () -> Unit) {
         actions = {
             SecondaryButton(
                 stringResource(R.string.results_rotate_left),
-                onClick = onRotate,
+                onClick = { onRotate(false, false) },
                 compact = true,
                 modifier = Modifier.semantics { contentDescription = left },
             )
             SecondaryButton(
                 stringResource(R.string.results_rotate_right),
-                onClick = onRotate,
+                onClick = { onRotate(true, false) },
                 compact = true,
                 modifier = Modifier.semantics { contentDescription = right },
             )
@@ -239,10 +285,12 @@ private fun StatusCounters(
 }
 
 private val previewState = ScanUiState(slots = FakeData.weeklySlots, calendars = FakeData.calendars)
+private val rotationState = previewState.copy(warnings = listOf(ParseWarning.ROTATED_QUARTER_TURN))
+private val teamState = ScanUiState(slots = emptyList(), calendars = FakeData.calendars, people = listOf("Camille B.", "Dominique L.", "Sam R."))
 
 @Composable
-private fun PreviewScreen(mode: ThemeMode, tab: Int = 0, rotation: Boolean = false) = CalEventTheme(mode) {
-    ResultsContent(previewState, {}, {}, {}, {}, {}, showRotationWarning = rotation, initialTab = tab)
+private fun PreviewScreen(mode: ThemeMode, tab: Int = 0, rotation: Boolean = false, team: Boolean = false) = CalEventTheme(mode) {
+    ResultsContent(if (team) teamState else if (rotation) rotationState else previewState, {}, {}, {}, {}, {}, { _, _ -> }, initialTab = tab)
 }
 
 @Preview(name = "Agenda light", widthDp = 390, heightDp = 844)
@@ -268,3 +316,11 @@ private fun RotationLightPreview() = PreviewScreen(ThemeMode.LIGHT, rotation = t
 @Preview(name = "Rotation dark", widthDp = 390, heightDp = 844)
 @Composable
 private fun RotationDarkPreview() = PreviewScreen(ThemeMode.DARK, rotation = true)
+
+@Preview(name = "Team light", widthDp = 390, heightDp = 844)
+@Composable
+private fun TeamLightPreview() = PreviewScreen(ThemeMode.LIGHT, team = true)
+
+@Preview(name = "Team dark", widthDp = 390, heightDp = 844)
+@Composable
+private fun TeamDarkPreview() = PreviewScreen(ThemeMode.DARK, team = true)

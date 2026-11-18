@@ -49,8 +49,8 @@
     <string name="analysis_step_detect">Détection</string>
     <string name="analysis_step_read">Lecture</string>
     <string name="analysis_step_structure">Structuration</string>
-    <string name="analysis_detail_detect">Tableau trouvé · 13 lignes</string>
-    <string name="analysis_detail_read">Lecture des cases une à une</string>
+    <string name="analysis_detail_detect">Chargement et mise à l\'endroit de la photo</string>
+    <string name="analysis_detail_read">Reconnaissance du texte sur le téléphone</string>
     <string name="analysis_detail_structure">Dates, horaires, créneaux</string>
     <string name="analysis_state_done">Terminé</string>
     <string name="analysis_state_running">En cours</string>
