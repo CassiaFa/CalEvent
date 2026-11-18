@@ -39,8 +39,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.calevent.app.R
-import fr.calevent.app.data.PlanningKind
-import fr.calevent.app.data.RecentPlanning
+import fr.calevent.app.ui.screens.history.HistoryCard
+import fr.calevent.app.ui.screens.history.HistoryDetailSheet
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
 import fr.calevent.app.ui.ScanViewModel
 import fr.calevent.app.ui.components.BottomActionBar
 import fr.calevent.app.ui.components.IconActionButton
@@ -62,8 +64,7 @@ import java.util.Locale
  * This is the reference screen for the others: ScreenScaffold + BottomActionBar + theme tokens only.
  *
  * @param onTakePhoto start the camera. @param onImport the gallery photo was picked and imported: go on to the preview.
- * @param onOpenSettings open settings. @param onOpenRecent open a recent planning (its id).
- * @param onSeeAll "Tout voir" link of the recent list.
+ * @param onOpenSettings open settings. @param onSeeAll "Tout voir" link of the recent list (full history).
  */
 @Composable
 fun HomeScreen(
@@ -71,10 +72,13 @@ fun HomeScreen(
     onTakePhoto: () -> Unit,
     onImport: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenRecent: (String) -> Unit,
     onSeeAll: () -> Unit,
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val history by viewModel.historyEntries.collectAsState()
+    var openId by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    // Binds the history store (no permission involved); the calendar permission is never asked here.
+    LaunchedEffect(Unit) { viewModel.attach(context) }
     var importError by remember { mutableStateOf(false) }
     // "Importer" opens the system photo picker; onImport runs once the photo is the current one.
     val importer = rememberGalleryImporter(onImported = { importError = false; onImport() }, onError = { importError = true })
@@ -127,57 +131,20 @@ fun HomeScreen(
                 }
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                state.recentPlannings.forEach { RecentPlanningCard(it, onClick = { onOpenRecent(it.id) }) }
+                if (history.isEmpty()) {
+                    Text(stringResource(R.string.home_recent_empty), style = t.secondary, color = c.ink2)
+                }
+                history.take(3).forEach { e -> HistoryCard(e, onClick = { openId = e.id }) }
             }
         }
     }
-}
-
-@Composable
-private fun RecentPlanningCard(planning: RecentPlanning, onClick: () -> Unit) {
-    val c = CalEventTheme.colors
-    val t = CalEventTheme.type
-    val shape = RoundedCornerShape(16.dp)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 72.dp)
-            .background(c.surface, shape)
-            .border(1.dp, c.line, shape)
-            .clip(shape)
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(start = 14.dp, top = 12.dp, end = 12.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        PlanningPhotoPlaceholder(
-            variant = when (planning.kind) {
-                PlanningKind.WEEKLY -> PlanningPhotoVariant.Weekly
-                PlanningKind.TEAM_CODES -> PlanningPhotoVariant.TeamCodes
-                PlanningKind.WALL_CALENDAR -> PlanningPhotoVariant.WallCalendar
-            },
-            modifier = Modifier
-                .size(width = 52.dp, height = 56.dp)
-                .rotate(-3f)
-                .clip(RoundedCornerShape(10.dp))
-                .border(1.dp, c.line, RoundedCornerShape(10.dp)),
-        )
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(planning.title, style = t.bodyStrong, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text(planning.subtitle, style = t.secondary, color = c.ink2, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }
-        if (planning.toReviewCount > 0) {
-            StatusChip(SlotStatus.TO_REVIEW, pluralStringResource(R.plurals.recent_to_review, planning.toReviewCount, planning.toReviewCount), compact = true)
-        } else {
-            StatusChip(SlotStatus.KEPT, pluralStringResource(R.plurals.recent_added, planning.addedCount, planning.addedCount), compact = true)
-        }
-    }
+    history.firstOrNull { it.id == openId }?.let { HistoryDetailSheet(it, onDismiss = { openId = null }) }
 }
 
 @Preview(widthDp = 390, heightDp = 844)
 @Composable
-private fun HomeScreenLightPreview() = CalEventTheme(ThemeMode.LIGHT) { HomeScreen(remember { ScanViewModel() }, {}, {}, {}, {}, {}) }
+private fun HomeScreenLightPreview() = CalEventTheme(ThemeMode.LIGHT) { HomeScreen(remember { ScanViewModel() }, {}, {}, {}, {}) }
 
 @Preview(widthDp = 390, heightDp = 844)
 @Composable
-private fun HomeScreenDarkPreview() = CalEventTheme(ThemeMode.DARK) { HomeScreen(remember { ScanViewModel() }, {}, {}, {}, {}, {}) }
+private fun HomeScreenDarkPreview() = CalEventTheme(ThemeMode.DARK) { HomeScreen(remember { ScanViewModel() }, {}, {}, {}, {}) }

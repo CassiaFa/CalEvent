@@ -22,7 +22,8 @@ import java.time.ZoneId
 import fr.calevent.app.data.DeviceCalendar
 import fr.calevent.app.settings.Settings
 import fr.calevent.app.data.FakeData
-import fr.calevent.app.data.RecentPlanning
+import fr.calevent.app.history.HistoryRepository
+import fr.calevent.core.HistoryEntry
 import fr.calevent.core.CalendarEvent
 import fr.calevent.core.SendPlan
 import fr.calevent.core.Slot
@@ -66,6 +67,8 @@ data class SendResult(
     /** Start of the first created event (epoch millis), to open the calendar app on that day. */
     val firstStartMillis: Long?,
     val undone: Boolean = false,
+    /** Id of the history entry written for this send (removed again on undo). */
+    val historyId: String? = null,
 )
 
 /** Everything the scan flow shows. Derived values are computed once per state. */
@@ -78,7 +81,6 @@ data class ScanUiState(
     val selectedCalendarId: Long? = null,
     /** Events already present in the target calendar (used to detect duplicates). */
     val existingEvents: List<CalendarEvent> = emptyList(),
-    val recentPlannings: List<RecentPlanning> = emptyList(),
     val calendarAccess: CalendarAccess = CalendarAccess.GRANTED,
     /** True while calendars or existing events are being read. */
     val loading: Boolean = false,
@@ -149,16 +151,23 @@ class ScanViewModel : ViewModel() {
             calendars = FakeData.calendars,
             selectedCalendarId = FakeData.calendars.first().id,
             existingEvents = FakeData.existingEvents,
-            recentPlannings = FakeData.recentPlannings,
         ),
     )
     val uiState: StateFlow<ScanUiState> = _uiState.asStateFlow()
+
+    private var history: HistoryRepository? = null
+    private val _history = MutableStateFlow<List<HistoryEntry>>(emptyList())
+
+    /** Last sends, newest first (home list and history screen). Empty until [attach]. */
+    val historyEntries: StateFlow<List<HistoryEntry>> = _history.asStateFlow()
 
     /** Binds the real calendar provider (idempotent). Drops the fake calendars and existing events. */
     fun attach(context: Context) {
         if (repository is ContentResolverCalendarRepository) return
         repository = ContentResolverCalendarRepository(context)
         prefs = context.applicationContext.getSharedPreferences("calevent", Context.MODE_PRIVATE)
+        val repo = HistoryRepository.get(context).also { history = it }
+        viewModelScope.launch { repo.load(); repo.entries.collect { _history.value = it } }
         _uiState.update {
             it.copy(calendars = emptyList(), selectedCalendarId = null, existingEvents = emptyList(), calendarAccess = CalendarAccess.UNKNOWN)
         }
@@ -274,7 +283,21 @@ class ScanViewModel : ViewModel() {
             }
             prefs?.edit()?.putLong(KEY_LAST_CALENDAR, calendar.id)?.apply()
             val zone = ZoneId.systemDefault()
-            val first = (plan.events - result.failed.toSet()).minByOrNull { it.start }
+            val written = (plan.events - result.failed.toSet()).ifEmpty { plan.events }
+            val first = written.minByOrNull { it.start }
+            val historyId = java.util.UUID.randomUUID().toString()
+            history?.let { repo ->
+                val isTeam = s.people.isNotEmpty()
+                val entry = HistoryEntry(
+                    id = historyId, createdAtMillis = System.currentTimeMillis(), kindLabel = s.kindLabel,
+                    isTeam = isTeam, personName = if (isTeam) s.selectedPerson else null,
+                    addedCount = result.createdIds.size, calendarName = calendar.name,
+                    from = written.minOf { it.start.toLocalDate() }, to = written.maxOf { it.end.minusSeconds(1).toLocalDate() },
+                    hasThumbnail = false, eventIds = result.createdIds,
+                )
+                // History is best effort: a failure here must not hide that the events were written.
+                runCatching { repo.add(entry, _photoBitmap.value) }
+            }
             _uiState.update {
                 it.copy(
                     sending = false,
@@ -283,6 +306,7 @@ class ScanViewModel : ViewModel() {
                         calendarName = calendar.name,
                         duplicatesIgnored = plan.duplicates.alreadyPresent.size,
                         failedCount = result.failed.size,
+                        historyId = historyId,
                         firstStartMillis = first?.let { e ->
                             if (e.allDay) e.start.atZone(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
                             else e.start.atZone(zone).toInstant().toEpochMilli()
@@ -300,6 +324,7 @@ class ScanViewModel : ViewModel() {
         if (result.undone) return
         viewModelScope.launch {
             val ok = runCatching { repository.delete(result.createdIds) }.isSuccess
+            if (ok) result.historyId?.let { id -> history?.let { runCatching { it.remove(id) } } }
             _uiState.update {
                 if (ok) it.copy(sendResult = result.copy(undone = true), error = null) else it.copy(error = SendError.INSERT)
             }

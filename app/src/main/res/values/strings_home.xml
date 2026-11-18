@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_recent_empty">Aucun planning ajouté pour l\'instant. Photographiez-en un pour commencer.</string>
+    <string name="history_title">Derniers plannings</string>
+    <string name="history_empty">Aucun planning ajouté pour l\'instant.</string>
+    <string name="history_kind_default">Planning</string>
+    <string name="history_subtitle">%1$s · %2$s</string>
+    <plurals name="history_added">
+        <item quantity="one">%d créneau ajouté</item>
+        <item quantity="other">%d créneaux ajoutés</item>
+    </plurals>
+    <string name="history_detail_calendar">Agenda</string>
+    <string name="history_detail_period">Période</string>
+    <string name="history_detail_added">Ajouté le</string>
+    <string name="history_detail_person">Personne</string>
+    <string name="history_detail_note">Les créneaux sont dans votre agenda. La photo n\'est conservée que selon la durée choisie dans les réglages.</string>
+    <string name="history_close">Fermer</string>
+    <string name="history_thumb_cd">Miniature du planning</string>
+</resources>

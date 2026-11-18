@@ -1,6 +1,7 @@
 package fr.calevent.app.capture
 
 import android.content.Context
+import fr.calevent.app.history.HistoryRepository
 import fr.calevent.core.PhotoRetention
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -25,6 +26,7 @@ object PhotoStorage {
     suspend fun deleteAll(context: Context) = withContext(Dispatchers.IO) {
         val keep = currentFile()
         files(context).filter { it != keep }.forEach { it.delete() }
+        HistoryRepository.get(context).clearThumbnails()
     }
 
     /** Deletes photos older than [retention] (never the current one). */
@@ -32,5 +34,6 @@ object PhotoStorage {
         withContext(Dispatchers.IO) {
             val keep = currentFile()
             files(context).filter { it != keep && retention.isExpired(it.lastModified(), nowMillis) }.forEach { it.delete() }
+            HistoryRepository.get(context).purgeExpiredThumbnails(retention, nowMillis)
         }
 }
