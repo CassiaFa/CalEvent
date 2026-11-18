@@ -119,4 +119,76 @@ class ShiftCodeTableTest {
         assertEquals(d(2026, 11, 30).atTime(21, 0), event.start)
         assertEquals(d(2026, 12, 1).atTime(7, 0), event.end)
     }
+
+    private val fx = ShiftCode("FX", "Formation", start = t(9), end = t(17))
+
+    @Test
+    fun `with adds then replaces in place and keeps the order`() {
+        val added = table.with(fx)
+        assertEquals("FX", added.codes.last().code)
+        val replaced = added.with(fx.copy(label = "Stage"))
+        assertEquals(added.size, replaced.size)
+        assertEquals("Stage", replaced.find("fx")?.label)
+        assertEquals(added.codes.map { it.code }, replaced.codes.map { it.code })
+        assertEquals(table, replaced.without("FX"))
+    }
+
+    @Test
+    fun `absence is normalised to a bare all-day Absence`() {
+        val t2 = table.with(ShiftCode("ZZ", "Arrêt maladie grippe", ShiftType.ABSENCE, start = t(8), end = t(9)))
+        val e = assertNotNull(t2.find("ZZ"))
+        assertEquals("Absence", e.label)
+        assertTrue(e.allDay)
+        assertNull(e.start)
+        assertEquals("Absence", t2.toSlot("ZZ", day).title)
+    }
+
+    @Test
+    fun `serialisation round-trips the default table and edits`() {
+        val edited = table.with(fx).with(ShiftCode("NX", "Nuit longue", start = t(20, 30), end = t(8), endsNextDay = true)).without("CA")
+        assertEquals(edited, ShiftCodeTable.parse(edited.serialize()))
+        assertEquals(table, ShiftCodeTable.parse(table.serialize()))
+        assertEquals(ShiftCodeTable(), ShiftCodeTable.parse(ShiftCodeTable().serialize()))
+    }
+
+    @Test
+    fun `invalid input is ignored safely`() {
+        assertEquals(0, ShiftCodeTable.parse(null).size)
+        assertEquals(0, ShiftCodeTable.parse("garbage\n\n\t\t").size)
+        val text = "M06\tMatin\tWORK\t06:00\t14:00\t0\t0\n" +
+            "BAD\tNo times\tWORK\t\t\t0\t0\n" +
+            "BAD2\tBad time\tWORK\t25:99\t14:00\t0\t0\n" +
+            "BAD3\tBad type\tFOO\t\t\t1\t0\n" +
+            "m 06\tDup\tWORK\t01:00\t02:00\t0\t0\n"
+        val parsed = ShiftCodeTable.parse(text)
+        assertEquals(listOf("M06"), parsed.codes.map { it.code })
+    }
+
+    @Test
+    fun `fields with tabs and line breaks survive serialisation`() {
+        val odd = table.with(ShiftCode("TB", "A\tB\nC", start = t(1), end = t(2)))
+        assertEquals("A B C", ShiftCodeTable.parse(odd.serialize()).find("TB")?.label)
+    }
+
+    @Test
+    fun `defining an unknown code recomputes its slots and keeps decisions`() {
+        val a = table.toSlot("FX", d(2026, 11, 16), "Moi", confidence = 0.95, id = "a").keep()
+        val b = table.toSlot("fx", d(2026, 11, 17), "Moi", confidence = 0.95, id = "b").copy(region = Region(0.1, 0.1, 0.2, 0.2))
+        val other = table.toSlot("QQ", d(2026, 11, 18), "Moi", confidence = 0.95, id = "c")
+        val known = table.toSlot("M06", d(2026, 11, 19), "Moi", id = "d").ignore()
+        val slots = listOf(a, b, other, known)
+        assertEquals(SlotStatus.TO_REVIEW, b.status)
+        assertEquals(listOf("FX", "QQ"), unknownCodesOf(slots, table))
+
+        val out = table.with(fx).resolveUnknownCodes(slots)
+        assertEquals("Formation (FX)", out[0].title)
+        assertEquals(t(9), out[0].start)
+        assertEquals(UserDecision.KEEP, out[0].decision)
+        assertEquals(SlotStatus.KEPT, out[1].status)
+        assertNull(out[1].reviewReason)
+        assertEquals(Region(0.1, 0.1, 0.2, 0.2), out[1].region)
+        assertEquals(other, out[2])
+        assertEquals(known, out[3])
+        assertEquals(listOf("QQ"), unknownCodesOf(out, table.with(fx)))
+    }
 }

@@ -31,6 +31,10 @@ data class Slot(
     val decision: UserDecision? = null,
     /** Where the slot was read on the photo, if known. */
     val region: Region? = null,
+    /** Raw shift code that is missing from the code table (set only on "Code inconnu" slots). */
+    val unknownCode: String? = null,
+    /** Recognition confidence before the unknown-code cap, restored once the code is defined. */
+    val uncappedConfidence: Double? = null,
 ) {
     init {
         require(confidence in 0.0..1.0) { "confidence must be within 0..1: $confidence" }
