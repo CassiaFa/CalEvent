@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -24,6 +25,13 @@ import fr.calevent.app.ui.screens.home.HomeScreen
 import fr.calevent.app.ui.screens.preview.PreviewScreen
 import fr.calevent.app.ui.screens.results.ResultsScreen
 import fr.calevent.app.ui.screens.send.SendScreen
+import fr.calevent.app.settings.Settings
+import fr.calevent.app.settings.SettingsRepository
+import fr.calevent.app.ui.screens.settings.AboutScreen
+import fr.calevent.app.ui.screens.settings.DefaultCalendarScreen
+import fr.calevent.app.ui.screens.settings.LicensesScreen
+import fr.calevent.app.ui.screens.settings.PrivacyPolicyScreen
+import fr.calevent.app.ui.screens.settings.PrivacySettingsScreen
 import fr.calevent.app.ui.screens.settings.SettingsScreen
 import fr.calevent.app.ui.screens.success.SuccessScreen
 
@@ -37,6 +45,11 @@ object Routes {
     const val Send = "send"
     const val Success = "success"
     const val Settings = "settings"
+    const val SettingsCalendar = "settings/calendar"
+    const val SettingsPrivacy = "settings/privacy"
+    const val SettingsAbout = "settings/about"
+    const val SettingsPolicy = "settings/policy"
+    const val SettingsLicenses = "settings/licenses"
 }
 
 /**
@@ -44,10 +57,15 @@ object Routes {
  * never the NavController.
  */
 @Composable
-fun AppNav(navController: NavHostController = rememberNavController()) {
+fun AppNav(
+    settings: Settings,
+    settingsRepository: SettingsRepository,
+    navController: NavHostController = rememberNavController(),
+) {
     // Called outside the NavHost: scoped to the activity, shared by every destination.
     val viewModel: ScanViewModel = viewModel()
     val back: () -> Unit = { navController.popBackStack() }
+    LaunchedEffect(settings) { viewModel.applySettings(settings) }
 
     val state by viewModel.uiState.collectAsState()
     val route = navController.currentBackStackEntryAsState().value?.destination?.route
@@ -118,6 +136,26 @@ fun AppNav(navController: NavHostController = rememberNavController()) {
             BackHandler(onBack = goHome)
             SuccessScreen(viewModel, onDone = goHome)
         }
-        composable(Routes.Settings) { SettingsScreen(viewModel, onBack = back) }
+        composable(Routes.Settings) {
+            SettingsScreen(
+                viewModel, settings, settingsRepository,
+                onBack = back,
+                onOpenCalendar = { navController.navigate(Routes.SettingsCalendar) },
+                onOpenPrivacy = { navController.navigate(Routes.SettingsPrivacy) },
+                onOpenAbout = { navController.navigate(Routes.SettingsAbout) },
+                onOpenLicenses = { navController.navigate(Routes.SettingsLicenses) },
+            )
+        }
+        composable(Routes.SettingsCalendar) { DefaultCalendarScreen(viewModel, settings, settingsRepository, onBack = back) }
+        composable(Routes.SettingsPrivacy) { PrivacySettingsScreen(settings, settingsRepository, onBack = back) }
+        composable(Routes.SettingsAbout) {
+            AboutScreen(
+                onBack = back,
+                onOpenPolicy = { navController.navigate(Routes.SettingsPolicy) },
+                onOpenLicenses = { navController.navigate(Routes.SettingsLicenses) },
+            )
+        }
+        composable(Routes.SettingsPolicy) { PrivacyPolicyScreen(onBack = back) }
+        composable(Routes.SettingsLicenses) { LicensesScreen(onBack = back) }
     }
 }

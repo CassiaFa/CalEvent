@@ -1,7 +1,9 @@
 package fr.calevent.app.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.selection.toggleable
@@ -23,6 +25,7 @@ fun ToggleRow(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    supporting: String? = null,
 ) {
     val c = CalEventTheme.colors
     Row(
@@ -33,7 +36,10 @@ fun ToggleRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = CalEventTheme.type.bodyStrong, color = c.ink, modifier = Modifier.weight(1f))
+        Column(Modifier.weight(1f).padding(vertical = 6.dp, horizontal = 0.dp)) {
+            Text(label, style = CalEventTheme.type.bodyStrong, color = c.ink)
+            if (supporting != null) Text(supporting, style = CalEventTheme.type.secondary, color = c.ink2)
+        }
         Switch(
             checked = checked,
             onCheckedChange = null,

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_section_calendar">Agenda</string>
+    <string name="settings_default_calendar">Agenda par défaut</string>
+    <string name="settings_me">« Moi » dans les plannings d\'équipe</string>
+    <string name="settings_codes">Table des codes de planning</string>
+    <string name="settings_soon">Bientôt</string>
+    <string name="settings_none">Aucun</string>
+    <string name="settings_set">Défini</string>
+    <string name="settings_ask_each_time">À chaque envoi</string>
+    <string name="settings_section_theme">Thème</string>
+    <string name="settings_theme_system">Système</string>
+    <string name="settings_theme_light">Clair</string>
+    <string name="settings_theme_dark">Sombre</string>
+    <string name="settings_section_privacy">Confidentialité</string>
+    <string name="settings_privacy_title">Tout reste sur ce téléphone</string>
+    <string name="settings_privacy_body">Les photos sont lues par l\'app elle-même, sans connexion. Aucune image ni aucun créneau n\'est envoyé : pas de compte, pas de serveur. Vous pouvez le vérifier en mode avion.</string>
+    <string name="settings_photos_kept">Photos conservées</string>
+    <string name="settings_photos_summary">%1$d · %2$s</string>
+    <string name="settings_delete_analyzed">Supprimer les photos analysées</string>
+    <string name="settings_section_about">À propos</string>
+    <string name="settings_about_app">CalEvent</string>
+    <string name="settings_version">Version %s</string>
+    <string name="settings_licenses">Licences</string>
+
+    <string name="settings_calendar_title">Agenda par défaut</string>
+    <string name="settings_calendar_section">Agendas du téléphone</string>
+    <string name="settings_calendar_note">Seuls les agendas modifiables sont proposés. Les couleurs sont celles de votre téléphone.</string>
+    <string name="settings_calendar_empty">Aucun agenda modifiable trouvé sur ce téléphone.</string>
+    <string name="settings_calendar_permission">L\'accès à l\'agenda est nécessaire pour lister vos agendas. Il n\'est demandé que maintenant, et reste sur ce téléphone.</string>
+    <string name="settings_calendar_permission_allow">Autoriser l\'accès</string>
+    <string name="settings_calendar_permission_settings">Ouvrir les réglages du téléphone</string>
+    <string name="settings_send_section">À l\'envoi</string>
+    <string name="settings_always_ask">Toujours demander l\'agenda</string>
+    <string name="settings_always_ask_off">Sinon, %s est choisi directement</string>
+    <string name="settings_always_ask_off_none">Sinon, l\'agenda par défaut est choisi directement</string>
+    <string name="settings_skip_duplicates">Ignorer les doublons</string>
+    <string name="settings_skip_duplicates_hint">Même date, mêmes horaires, même titre</string>
+
+    <string name="settings_privacy_screen_title">Confidentialité</string>
+    <string name="settings_steps_section">Ce qui se passe avec une photo</string>
+    <string name="settings_step_1">La photo reste dans l\'app, sur ce téléphone.</string>
+    <string name="settings_step_2">Elle est lue sur l\'appareil, sans connexion ni serveur.</string>
+    <string name="settings_step_3">Seuls les créneaux que vous validez vont dans l\'agenda du téléphone.</string>
+    <string name="settings_retention_group">Durée de conservation</string>
+    <string name="settings_retention_7">7 jours</string>
+    <string name="settings_retention_30">30 jours</string>
+    <string name="settings_retention_always">Toujours</string>
+    <plurals name="settings_photo_count">
+        <item quantity="one">%d photo</item>
+        <item quantity="other">%d photos</item>
+    </plurals>
+    <string name="settings_delete_all">Supprimer toutes les photos</string>
+    <string name="settings_delete_title">Supprimer toutes les photos ?</string>
+    <string name="settings_delete_message">Les photos conservées sur ce téléphone seront effacées. Les créneaux déjà ajoutés à l\'agenda ne sont pas touchés. La photo en cours d\'analyse est conservée.</string>
+    <string name="settings_delete_confirm">Supprimer</string>
+    <string name="settings_cancel">Annuler</string>
+    <string name="settings_permissions_section">Autorisations</string>
+    <string name="settings_permission_camera">Caméra</string>
+    <string name="settings_permission_calendar">Agenda</string>
+    <string name="settings_permission_camera_ok">Autorisée</string>
+    <string name="settings_permission_camera_no">Non autorisée</string>
+    <string name="settings_permission_calendar_ok">Autorisé</string>
+    <string name="settings_permission_calendar_no">Non autorisé</string>
+    <string name="settings_permission_manage">Gérer dans les réglages du téléphone</string>
+    <string name="settings_size_kb">%d Ko</string>
+    <string name="settings_size_mb">%s Mo</string>
+
+    <string name="settings_about_title">À propos</string>
+    <string name="settings_about_offline">Hors ligne · rien n\'est envoyé</string>
+    <string name="settings_about_intro">Revoir la présentation</string>
+    <string name="settings_about_soon">Revoir la présentation (bientôt)</string>
+    <string name="settings_about_policy">Politique de confidentialité</string>
+    <string name="settings_about_licenses">Licences open source</string>
+
+    <string name="settings_policy_title">Politique de confidentialité</string>
+    <string name="settings_policy_p1">CalEvent fonctionne entièrement sur votre téléphone. L\'app ne demande aucun compte, n\'utilise aucun serveur et ne possède même pas l\'autorisation d\'accéder à internet.</string>
+    <string name="settings_policy_h2">Ce que fait l\'app</string>
+    <string name="settings_policy_p2">La photo d\'un planning est prise ou importée, puis lue par un module de reconnaissance de texte intégré à l\'app. Le texte reconnu sert uniquement à proposer des créneaux que vous vérifiez avant de les ajouter à l\'agenda de votre téléphone.</string>
+    <string name="settings_policy_h3">Ce qui est conservé</string>
+    <string name="settings_policy_p3">Les photos restent dans l\'espace privé de l\'app, pour la durée choisie dans Réglages › Confidentialité. Vous pouvez les supprimer à tout moment. Vos réglages (agenda par défaut, thème, durée de conservation) sont enregistrés localement.</string>
+    <string name="settings_policy_h4">Ce qui n\'est jamais fait</string>
+    <string name="settings_policy_p4">Aucune photo, aucun texte et aucune donnée d\'usage ne quittent le téléphone : pas de statistiques, pas de publicité, pas de partage avec des tiers. Les agendas synchronisés (Google, CalDAV…) le sont par le système de votre téléphone, pas par CalEvent.</string>
+    <string name="settings_policy_h5">Autorisations</string>
+    <string name="settings_policy_p5">La caméra est demandée au moment de photographier un planning, l\'agenda au moment d\'ajouter des créneaux. Vous pouvez les retirer à tout moment dans les réglages du téléphone.</string>
+
+    <string name="settings_licenses_title">Licences open source</string>
+    <string name="settings_licenses_intro">CalEvent s\'appuie sur les composants suivants.</string>
+    <string name="settings_license_androidx">AndroidX (Core, Activity, Lifecycle, Navigation, DataStore), Jetpack Compose et Material 3</string>
+    <string name="settings_license_camerax">CameraX</string>
+    <string name="settings_license_kotlin">Kotlin et kotlinx.coroutines</string>
+    <string name="settings_license_mlkit">ML Kit Text Recognition (modèle embarqué)</string>
+    <string name="settings_license_fonts">Polices DM Sans et DM Mono</string>
+    <string name="settings_license_apache">Apache License 2.0</string>
+    <string name="settings_license_mlkit_terms">Conditions d\'utilisation de Google ML Kit</string>
+    <string name="settings_license_ofl">SIL Open Font License 1.1</string>
+</resources>

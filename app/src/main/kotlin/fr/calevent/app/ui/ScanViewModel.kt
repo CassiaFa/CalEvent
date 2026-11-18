@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
 import fr.calevent.app.data.DeviceCalendar
+import fr.calevent.app.settings.Settings
 import fr.calevent.app.data.FakeData
 import fr.calevent.app.data.RecentPlanning
 import fr.calevent.core.CalendarEvent
@@ -93,6 +94,8 @@ data class ScanUiState(
     val people: List<String> = emptyList(),
     /** Person chosen on a team schedule; null (the default) means nobody, hence no slots. */
     val selectedPerson: String? = null,
+    /** Réglages › Ignorer les doublons: when false, existing events are not compared. */
+    val skipDuplicates: Boolean = true,
 ) {
     /** True when a person must be chosen to see slots. */
     val needsPerson: Boolean = people.isNotEmpty() && selectedPerson == null
@@ -106,7 +109,7 @@ data class ScanUiState(
     val selectedCalendar: DeviceCalendar? = calendars.firstOrNull { it.id == selectedCalendarId }
 
     /** What "send" will do for the current selection. */
-    val sendPlan: SendPlan = SendPlan.build(slots, existingEvents)
+    val sendPlan: SendPlan = SendPlan.build(slots, if (skipDuplicates) existingEvents else emptyList())
 }
 
 /**
@@ -148,6 +151,24 @@ class ScanViewModel : ViewModel() {
         }
     }
 
+    private var settings = Settings()
+
+    /** Applies the user settings: default calendar, duplicate handling. Safe to call at every change. */
+    fun applySettings(new: Settings) {
+        val old = settings
+        settings = new
+        val before = _uiState.value.selectedCalendarId
+        _uiState.update { s ->
+            val preferred = new.defaultCalendarId?.takeIf { id -> !new.alwaysAskCalendar && s.calendars.any { it.id == id } }
+            val changed = new.defaultCalendarId != old.defaultCalendarId || new.alwaysAskCalendar != old.alwaysAskCalendar
+            s.copy(
+                skipDuplicates = new.skipDuplicates,
+                selectedCalendarId = if (preferred != null && (changed || s.selectedCalendarId == null)) preferred else s.selectedCalendarId,
+            )
+        }
+        if (_uiState.value.selectedCalendarId != before) loadExistingIfReady()
+    }
+
     /** Called when the send screen opens and each time the app resumes: re-checks the permission and reloads. */
     fun refreshAccess() {
         if (repository.hasPermission()) {
@@ -178,7 +199,9 @@ class ScanViewModel : ViewModel() {
             }
             val last = prefs?.getLong(KEY_LAST_CALENDAR, -1L)?.takeIf { it >= 0 }
             val current = _uiState.value.selectedCalendarId
-            val selected = listOf(current, last).firstOrNull { id -> id != null && list.any { it.id == id } }
+            val default = settings.defaultCalendarId
+            val order = if (settings.alwaysAskCalendar) listOf(current, last, default) else listOf(current, default, last)
+            val selected = order.firstOrNull { id -> id != null && list.any { it.id == id } }
             _uiState.update { it.copy(calendars = list, selectedCalendarId = selected, loading = false) }
             loadExisting()
         }
