@@ -5,7 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Matrix
 import fr.calevent.app.capture.CapturedPhotoStore
 import fr.calevent.app.ocr.OcrDebugDump
-import fr.calevent.app.ocr.TextRecognizerEngine
+import fr.calevent.app.ocr.createOcrEngine
 import fr.calevent.core.ShiftCodeTable
 import fr.calevent.core.parse.ParseResult
 import fr.calevent.core.parse.ParseWarning
@@ -52,7 +52,7 @@ class ScanAnalyzer {
         val original = minimumStep { CapturedPhotoStore.loadBitmap(context) }
 
         onStep(AnalysisStep.READ)
-        TextRecognizerEngine().use { engine ->
+        createOcrEngine(context).use { engine ->
             val started = System.currentTimeMillis()
             var best = Attempt(0, original, engine.recognize(original), null)
             best = best.copy(result = ScheduleParser.parse(best.text, today, codes))

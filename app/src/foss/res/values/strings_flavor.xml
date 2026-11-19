@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- foss flavor: Tesseract replaces ML Kit in the licences screen. -->
+    <string name="settings_license_mlkit">Tesseract OCR et Tesseract4Android (données fra, tessdata_fast)</string>
+    <string name="settings_license_mlkit_terms">Licence Apache 2.0</string>
+</resources>

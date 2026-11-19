@@ -18,7 +18,7 @@ import kotlin.coroutines.resumeWithException
  * On-device text recognition with ML Kit's Latin model bundled in the APK: no download, no network.
  * One instance can process several images; [close] it when done (e.g. in `ViewModel.onCleared`).
  */
-class TextRecognizerEngine : AutoCloseable {
+internal class TextRecognizerEngine : OcrEngine {
 
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
@@ -27,7 +27,7 @@ class TextRecognizerEngine : AutoCloseable {
      * rotation that makes the image upright, e.g. CameraX `imageInfo.rotationDegrees`. Returned
      * coordinates are pixels of the upright image. Cancelling the coroutine drops the result.
      */
-    suspend fun recognize(bitmap: Bitmap, rotationDegrees: Int = 0): RecognizedText {
+    override suspend fun recognize(bitmap: Bitmap, rotationDegrees: Int): RecognizedText {
         val image = InputImage.fromBitmap(bitmap, rotationDegrees)
         val text = suspendCancellableCoroutine { cont ->
             recognizer.process(image)

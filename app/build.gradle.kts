@@ -15,6 +15,20 @@ android {
         versionName = "0.9.0"
     }
 
+    flavorDimensions += "distribution"
+    productFlavors {
+        // Google Play / sideload: ML Kit Text Recognition (bundled model, non-free).
+        create("play") { dimension = "distribution" }
+        // F-Droid: only free dependencies, OCR with Tesseract. Same applicationId (no suffix).
+        create("foss") { dimension = "distribution" }
+    }
+
+    // F-Droid rejects the signed dependency blob that AGP adds to APKs and bundles by default.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -53,5 +67,8 @@ dependencies {
     implementation(libs.camerax.camera2)
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.view)
-    implementation(libs.mlkit.text.recognition)
+
+    // OCR engines: one per flavor, behind ocr/OcrEngine.
+    "playImplementation"(libs.mlkit.text.recognition)
+    "fossImplementation"(libs.tesseract4android)
 }

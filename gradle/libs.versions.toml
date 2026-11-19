@@ -10,6 +10,7 @@ coreSplashscreen = "1.2.0"
 datastore = "1.3.0"
 camerax = "1.6.2"
 mlkitText = "16.0.1"
+tesseract4android = "4.9.0"
 junit = "5.13.4"
 
 [libraries]
@@ -30,6 +31,8 @@ camerax-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref =
 camerax-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
 # Bundled model (no Play Services download): recognition works fully offline.
 mlkit-text-recognition = { module = "com.google.mlkit:text-recognition", version.ref = "mlkitText" }
+# Apache-2.0, free OCR for the F-Droid flavor (published on JitPack, see settings.gradle.kts).
+tesseract4android = { module = "cz.adaptech.tesseract4android:tesseract4android", version.ref = "tesseract4android" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 
 [plugins]

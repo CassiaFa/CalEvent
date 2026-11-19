@@ -1,7 +1,7 @@
 package fr.calevent.app.capture
 
 import android.content.Context
-import fr.calevent.app.ocr.TextRecognizerEngine
+import fr.calevent.app.ocr.createOcrEngine
 import fr.calevent.core.crop.TextBounds
 import kotlinx.coroutines.CancellationException
 
@@ -17,7 +17,7 @@ object AutoCrop {
         return try {
             val bitmap = CapturedPhotoStore.loadBitmap(context, maxSide = MAX_SIDE, applyCrop = false)
             try {
-                val text = TextRecognizerEngine().use { it.recognize(bitmap) }
+                val text = createOcrEngine(context).use { it.recognize(bitmap) }
                 TextBounds.suggestCrop(text)?.let { CropRect(it.left, it.top, it.right, it.bottom) }
             } finally {
                 bitmap.recycle()
