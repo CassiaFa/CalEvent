@@ -9,6 +9,7 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import com.googlecode.tesseract.android.TessBaseAPI
 import com.googlecode.tesseract.android.TessBaseAPI.PageIteratorLevel
+import fr.calevent.core.image.OcrPreprocess
 import fr.calevent.core.parse.Box
 import fr.calevent.core.parse.RecognizedText
 import fr.calevent.core.parse.TextElement
@@ -68,7 +69,11 @@ internal class TesseractEngine(private val context: Context) : OcrEngine {
         return tess
     }
 
-    /** Rotates upright, converts to grayscale and downscales so the long side is at most [MAX_SIDE]. */
+    /**
+     * Rotates upright, converts to grayscale and downscales so the long side is at most [MAX_SIDE], then
+     * evens out the lighting and erases the table grid ([OcrPreprocess]): tinted cells and ruled lines are
+     * what makes Tesseract misread plannings. Runs on the caller's background dispatcher.
+     */
     private fun prepare(src: Bitmap, rotationDegrees: Int, width: Int, height: Int): Bitmap {
         val scale = minOf(1.0, MAX_SIDE.toDouble() / max(width, height)).toFloat()
         val outW = max(1, (width * scale).roundToInt())
@@ -88,7 +93,21 @@ internal class TesseractEngine(private val context: Context) : OcrEngine {
             colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) })
         }
         Canvas(out).drawBitmap(src, matrix, paint)
+        cleanUp(out)
         return out
+    }
+
+    /** Replaces the pixels of the gray [bitmap] by their [OcrPreprocess] version, in place. */
+    private fun cleanUp(bitmap: Bitmap) {
+        val w = bitmap.width
+        val h = bitmap.height
+        val argb = IntArray(w * h)
+        bitmap.getPixels(argb, 0, w, 0, 0, w, h)
+        // The bitmap is already gray: any channel (here blue) is the gray level.
+        val gray = IntArray(w * h) { argb[it] and 0xFF }
+        val clean = OcrPreprocess.process(gray, w, h)
+        for (i in argb.indices) argb[i] = OPAQUE or (clean[i] * 0x010101)
+        bitmap.setPixels(argb, 0, w, 0, 0, w, h)
     }
 
     /** Reads words grouped by text line; boxes are scaled by [scale] back to the upright image. */
@@ -138,6 +157,7 @@ internal class TesseractEngine(private val context: Context) : OcrEngine {
     private companion object {
         const val LANGUAGE = "fra"
         const val MAX_SIDE = 2000
+        const val OPAQUE = 0xFF000000.toInt()
     }
 }
 
