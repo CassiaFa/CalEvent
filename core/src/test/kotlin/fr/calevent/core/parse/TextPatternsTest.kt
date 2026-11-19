@@ -154,4 +154,27 @@ class TextPatternsTest {
         val tricky = RecognizedText(10, 20, listOf(TextLine("a \"b\" \\ é\n", Box(0.0, 1.0, 2.0, 3.5))))
         assertEquals(tricky, RecognizedTextJson.read(RecognizedTextJson.write(tricky)))
     }
+
+    @Test
+    fun `range word glued to a time is still a range`() {
+        for (raw in listOf("22h à6h", "22hà 6h", "22hà6h", "22h à 6h")) {
+            val r = parseTimes(raw)
+            assertEquals(listOf(TimeRange(t(22), t(6), true)), r.ranges, raw)
+            assertFalse(r.corrected, raw)
+        }
+        assertEquals(listOf(TimeRange(t(8), t(16), false)), parseTimes("8hà16h Quai 12").ranges)
+        assertEquals("Quai 12", parseTimes("8hà16h Quai 12").rest)
+    }
+
+    @Test
+    fun `first hour read as a letter is repaired and flagged`() {
+        val five = parseTimes("Sh à 13h Site Val-Fleuri")
+        assertEquals(listOf(TimeRange(t(5), t(13), false)), five.ranges)
+        assertTrue(five.corrected)
+        assertEquals(listOf(TimeRange(t(8), t(16), false)), parseTimes("&h à 16h").ranges)
+        assertEquals(listOf(TimeRange(t(8, 30), t(17, 30), false)), parseTimes("Bh30 à 17h30").ranges)
+        // Ordinary words are left alone.
+        assertEquals("Shop", parseTimes("Shop").rest)
+        assertTrue(parseTimes("Bureau").ranges.isEmpty())
+    }
 }

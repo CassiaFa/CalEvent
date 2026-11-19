@@ -27,6 +27,21 @@ private val LEADING_NOISE = Regex("""^[\s/,;:.\-–—]*(?:(?:de|et|puis)\s+)?[\
 private val TRAILING_NOISE = Regex("""[\s/,;:.\-–—]*(?:\s(?:de|et|à|a))?[\s/,;:.\-–—]*$""", RegexOption.IGNORE_CASE)
 private val SPACES = Regex("""\s+""")
 
+/** "22h à6h", "22hà 6h", "8hà16h": the range word glued to a time; re-spaced so [TIME] sees both times. */
+private val GLUED_RANGE = Regex("""(\d[hH:]\d{0,2})\s*([àá])\s*(?=[0-9OolI|]{1,2}\s?[hH:])""")
+
+/** First digit of a range read as a letter ("Sh à 13h", "&h à 16h", "Bh30 à 17h30"): S→5, &→8, B→8. */
+private val LETTER_HOUR = Regex("""(?<![\p{L}\d])([SB&])(?=[hH]\d{0,2}\s*(?:à|á|a|-|–)\s*\d)""")
+private val LETTER_HOUR_DIGIT = mapOf("S" to "5", "B" to "8", "&" to "8")
+
+/** Repairs OCR spacing and letter-for-digit slips around time ranges. Returns the text and whether a digit was guessed. */
+internal fun repairTimeRanges(text: String): Pair<String, Boolean> {
+    val spaced = GLUED_RANGE.replace(text) { m -> "${m.groupValues[1]} ${m.groupValues[2]} " }
+    var guessed = false
+    val fixed = LETTER_HOUR.replace(spaced) { m -> guessed = true; LETTER_HOUR_DIGIT.getValue(m.value) }
+    return fixed to guessed
+}
+
 /** Replaces digit look-alikes inside time-shaped words ("l4h3O" -> "14h30"). Returns the text and whether it changed. */
 internal fun fixTimeDigits(text: String): Pair<String, Boolean> {
     var changed = false
@@ -53,7 +68,9 @@ internal fun fixNumber(text: String): Int? {
  * "8h–12h / 14h–18h" (two ranges). The rest of the text is returned as the title.
  */
 internal fun parseTimes(raw: String): TimedText {
-    val (text, corrected) = fixTimeDigits(raw)
+    val (repaired, guessed) = repairTimeRanges(raw)
+    val (text, fixedDigits) = fixTimeDigits(repaired)
+    val corrected = guessed || fixedDigits
     val matches = TIME.findAll(text).mapNotNull { m ->
         val hour = m.groupValues[1].toInt()
         val minute = m.groupValues[2].ifEmpty { "0" }.toInt()
