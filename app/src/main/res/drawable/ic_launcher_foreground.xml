@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive icon foreground: the logo content without its slate tile (the tile becomes the icon background),
+     scaled into the 66 dp safe zone of the 108 dp canvas so launcher masks (circle, squircle) never crop it.
+     Logo content spans about x 14..75, y 16..76 in the 88-unit logo; scale 0.74 centres it at (54, 54). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <group android:scaleX="0.74" android:scaleY="0.74" android:translateX="21.07" android:translateY="19.96">
+        <path android:fillColor="#F0A202" android:pathData="M18,16h51a4,4 0 0 1 0,8h-51a4,4 0 0 1 0,-8z" />
+        <path android:fillColor="#51677D" android:pathData="M14,31h17.5v13h-17.5zM35,31h17.5v13h-17.5zM55.5,31h17.5v13h-17.5zM14,47h17.5v13h-17.5zM55.5,47h17.5v13h-17.5zM14,63h17.5v13h-17.5zM35,63h17.5v13h-17.5zM55.5,63h17.5v13h-17.5z" />
+        <path android:strokeColor="#F0A202" android:strokeWidth="1.6" android:pathData="M35.8,47.8h15.9v11.4h-15.9z" />
+        <group android:rotation="-15" android:pivotX="63" android:pivotY="44.5">
+            <path android:fillColor="#F0A202" android:strokeColor="#2E3E4E" android:strokeWidth="1" android:pathData="M51.5,37.5h23v14h-23z" />
+            <path android:strokeColor="#1C2733" android:strokeWidth="2.6" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M57.5,44.5l3.6,3.6 7.4,-7.2" />
+        </group>
+    </group>
+</vector>

@@ -5,9 +5,10 @@
     </style>
 
     <!-- System splash (Android 12+ native, backported by core-splashscreen), then Theme.CalEvent. -->
-    <style name="Theme.CalEvent.Splash" parent="Theme.SplashScreen">
+    <style name="Theme.CalEvent.Splash" parent="Theme.SplashScreen.IconBackground">
         <item name="windowSplashScreenBackground">@color/window_bg</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_logo</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/ic_launcher_bg</item>
         <item name="postSplashScreenTheme">@style/Theme.CalEvent</item>
     </style>
 </resources>
