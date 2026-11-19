@@ -26,7 +26,7 @@ class OcrEvalReport {
         val today = LocalDate.now()
         val codes = ShiftCodeTable.default()
         val out = StringBuilder()
-        val engines = root.listFiles { f -> f.isDirectory && f.name != "img" }!!.sortedBy { it.name }
+        val engines = root.listFiles { f -> f.isDirectory && f.listFiles { j -> j.name.endsWith("_0.json") }?.isNotEmpty() == true }!!.sortedBy { it.name }
         for (engine in engines) {
             out.appendLine("################ ${engine.name}")
             val photos = engine.listFiles { f -> f.name.endsWith("_0.json") }!!.map { it.name.removeSuffix("_0.json") }.sorted()
