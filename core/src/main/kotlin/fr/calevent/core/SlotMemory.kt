@@ -3,8 +3,11 @@ package fr.calevent.core
 /** True when two names are the same ignoring case, accents and extra spaces. */
 fun sameName(a: String?, b: String?): Boolean = a != null && b != null && a.searchKey() == b.searchKey()
 
-/** First of [people] that is the same name as [name], or null. */
-fun findPerson(people: List<String>, name: String?): String? = people.firstOrNull { sameName(it, name) }
+/**
+ * First of [people] matching [name], or null. [name] is a plain label or a [PersonName.encode]d name;
+ * see [findPersonByName] for the matching rules.
+ */
+fun findPerson(people: List<String>, name: String?): String? = findPersonByName(people, PersonName.decode(name))
 
 /**
  * What the user changed on a slot, kept for the whole scan session.

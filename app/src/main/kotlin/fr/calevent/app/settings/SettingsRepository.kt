@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import fr.calevent.app.ui.theme.ThemeMode
+import fr.calevent.core.PersonName
 import fr.calevent.core.PhotoRetention
 import fr.calevent.core.ShiftCodeTable
 import kotlinx.coroutines.flow.Flow
@@ -20,7 +21,10 @@ data class Settings(
     val alwaysAskCalendar: Boolean = false,
     val skipDuplicates: Boolean = true,
     val theme: ThemeMode = ThemeMode.SYSTEM,
-    /** Name of the user in team schedules ("Moi"). */
+    /**
+     * The user in team schedules ("Moi"), as a [PersonName.encode]d string (a plain string is a legacy
+     * surname-only value). Decode with [PersonName.decode]; pass it to `findPerson`.
+     */
     val me: String? = null,
     val photoRetention: PhotoRetention = PhotoRetention.DAYS_30,
     /** False until the first-launch presentation was finished or skipped. */
@@ -38,7 +42,7 @@ class SettingsRepository private constructor(context: Context) {
             alwaysAskCalendar = p[ALWAYS_ASK] ?: false,
             skipDuplicates = p[SKIP_DUPLICATES] ?: true,
             theme = p[THEME]?.let { n -> ThemeMode.entries.firstOrNull { it.name == n } } ?: ThemeMode.SYSTEM,
-            me = p[ME]?.takeIf { it.isNotBlank() },
+            me = PersonName(p[ME].orEmpty(), p[ME_FIRST].orEmpty()).encode(),
             photoRetention = p[RETENTION]?.let { n -> PhotoRetention.entries.firstOrNull { it.name == n } } ?: PhotoRetention.DAYS_30,
             onboardingDone = p[ONBOARDING_DONE] ?: false,
         )
@@ -56,7 +60,13 @@ class SettingsRepository private constructor(context: Context) {
     suspend fun setAlwaysAskCalendar(v: Boolean) = store.edit { it[ALWAYS_ASK] = v }
     suspend fun setSkipDuplicates(v: Boolean) = store.edit { it[SKIP_DUPLICATES] = v }
     suspend fun setTheme(mode: ThemeMode) = store.edit { it[THEME] = mode.name }
-    suspend fun setMe(name: String?) = store.edit { if (name.isNullOrBlank()) it.remove(ME) else it[ME] = name }
+    /** Legacy single-string form: the name is stored as the surname. */
+    suspend fun setMe(name: String?) = setMe(name, null)
+
+    suspend fun setMe(last: String?, first: String?) = store.edit {
+        if (last.isNullOrBlank()) it.remove(ME) else it[ME] = last.trim()
+        if (first.isNullOrBlank()) it.remove(ME_FIRST) else it[ME_FIRST] = first.trim()
+    }
     suspend fun setOnboardingDone(v: Boolean) = store.edit { it[ONBOARDING_DONE] = v }
     suspend fun setPhotoRetention(r: PhotoRetention) = store.edit { it[RETENTION] = r.name }
 
@@ -66,6 +76,7 @@ class SettingsRepository private constructor(context: Context) {
         private val SKIP_DUPLICATES = booleanPreferencesKey("skip_duplicates")
         private val THEME = stringPreferencesKey("theme")
         private val ME = stringPreferencesKey("me")
+        private val ME_FIRST = stringPreferencesKey("me_first")
         private val CODE_TABLE = stringPreferencesKey("shift_code_table")
         private val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         private val RETENTION = stringPreferencesKey("photo_retention")

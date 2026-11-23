@@ -40,6 +40,7 @@ import fr.calevent.app.ui.components.SegmentedControl
 import fr.calevent.app.ui.icons.CalEventIcons
 import fr.calevent.app.ui.theme.CalEventTheme
 import fr.calevent.app.ui.theme.ThemeMode
+import fr.calevent.core.PersonName
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -99,17 +100,17 @@ fun SettingsScreen(
     }
     if (editingMe) {
         EditMeDialog(
-            current = settings.me,
-            onSave = { name ->
+            current = PersonName.decode(settings.me),
+            onSave = { last, first ->
                 editingMe = false
-                scope.launch { repository.setMe(name) }
+                scope.launch { repository.setMe(last, first) }
             },
             onDismiss = { editingMe = false },
         )
     }
     SettingsContent(
         calendarName = calendarName,
-        me = settings.me,
+        me = PersonName.decode(settings.me)?.display,
         codesCount = codeTable?.size,
         theme = settings.theme,
         photosSummary = stats?.let { stringResource(R.string.settings_photos_summary, it.count, formatSize(it.bytes)) },
@@ -218,9 +219,10 @@ internal fun SettingsContent(
 
 /** Edit or clear the "Moi" name used to preselect the person in team schedules. */
 @Composable
-internal fun EditMeDialog(current: String?, onSave: (String?) -> Unit, onDismiss: () -> Unit) {
+internal fun EditMeDialog(current: PersonName?, onSave: (last: String?, first: String?) -> Unit, onDismiss: () -> Unit) {
     val c = CalEventTheme.colors
-    var name by remember { mutableStateOf(current.orEmpty()) }
+    var last by remember { mutableStateOf(current?.last.orEmpty()) }
+    var first by remember { mutableStateOf(current?.first.orEmpty()) }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = c.surface,
@@ -228,18 +230,19 @@ internal fun EditMeDialog(current: String?, onSave: (String?) -> Unit, onDismiss
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(R.string.settings_me_hint), style = CalEventTheme.type.body, color = c.ink2)
-                fr.calevent.app.ui.components.LabeledField(stringResource(R.string.settings_me_field), name, { name = it })
+                fr.calevent.app.ui.components.LabeledField(stringResource(R.string.settings_me_field), last, { last = it })
+                fr.calevent.app.ui.components.LabeledField(stringResource(R.string.settings_me_field_first), first, { first = it })
             }
         },
         confirmButton = {
-            androidx.compose.material3.TextButton(onClick = { onSave(name.trim().ifEmpty { null }) }, modifier = Modifier.heightIn(min = 48.dp)) {
+            androidx.compose.material3.TextButton(onClick = { onSave(last.trim().ifEmpty { null }, first.trim().ifEmpty { null }) }, modifier = Modifier.heightIn(min = 48.dp)) {
                 Text(stringResource(R.string.settings_me_save), color = c.ink)
             }
         },
         dismissButton = {
             Row {
                 if (current != null) {
-                    androidx.compose.material3.TextButton(onClick = { onSave(null) }, modifier = Modifier.heightIn(min = 48.dp)) {
+                    androidx.compose.material3.TextButton(onClick = { onSave(null, null) }, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text(stringResource(R.string.settings_me_clear), color = c.danger)
                     }
                 }
