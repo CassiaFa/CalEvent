@@ -2,7 +2,19 @@ package fr.calevent.app.ui.screens.preview
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
+import fr.calevent.core.crop.CropDrag
+import fr.calevent.core.crop.CropHandle
+import fr.calevent.core.crop.NormalizedRect
+import kotlin.math.max
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.offset
@@ -80,10 +92,18 @@ private val PhotoBackdrop = Color(0xFF2B241F)
 // Translucent black veil outside the crop area (the photo is dark in both themes, so black reads well).
 private val CropVeil = Color(0x59000000)
 private val CropOutline = Color(0xB3FFFFFF)
+private val LoupeDot = Color(0xFF000000)
+
+// Crop frame geometry: handles are drawn 22-24 dp wide inside a 48 dp touch target; the photo is inset by half of
+// it so handles on its border stay reachable; the frame never gets smaller than two touch targets.
+private val TouchTarget = 48.dp
+private val HandleInset = 24.dp
+private val MinFrame = 96.dp
+private val LoupeSize = 96.dp
 
 /**
  * Photo preview before analysis: shows the real photo from [CapturedPhotoStore], rotate in quarter turns,
- * crop with four draggable corner handles, retake (deletes the photo) or analyse.
+ * crop with a draggable frame (corners, edges, whole frame, magnifier), retake (deletes the photo) or analyse.
  * Without a photo in the store (e.g. previews) the fake planning is shown.
  */
 @Composable
@@ -206,69 +226,169 @@ private fun PhotoViewport(photo: CapturedPhoto?, cropping: Boolean, modifier: Mo
             PlanningPhotoPlaceholder(PlanningPhotoVariant.Weekly, Modifier.size(maxWidth - 56.dp, maxHeight - 52.dp))
         } else if (bmp != null) {
             val ratio = bmp.width.toFloat() / bmp.height
-            val fit = if (maxWidth / maxHeight > ratio) Modifier.fillMaxHeight().aspectRatio(ratio) else Modifier.fillMaxWidth().aspectRatio(ratio)
-            Box(fit) {
-                Image(bmp.asImageBitmap(), contentDescription = null, contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize())
-                if (cropping) CropOverlay(photo?.crop ?: CropRect.Full, { CapturedPhotoStore.setCrop(it) }, c.accent, Modifier.fillMaxSize())
-                else photo?.crop?.let { CropOverlay(it, {}, c.accent, Modifier.fillMaxSize(), interactive = false) }
+            // The photo is inset so that handles sitting on its border stay entirely inside the touchable area.
+            val availW = (maxWidth - HandleInset * 2).coerceAtLeast(1.dp)
+            val availH = (maxHeight - HandleInset * 2).coerceAtLeast(1.dp)
+            val widthLimited = availW / availH <= ratio
+            val photoW = if (widthLimited) availW else availH * ratio
+            val photoH = if (widthLimited) availW / ratio else availH
+            val image = remember(bmp) { bmp.asImageBitmap() }
+            Box(Modifier.size(photoW + HandleInset * 2, photoH + HandleInset * 2)) {
+                Image(image, contentDescription = null, contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize().padding(HandleInset))
+                if (cropping) CropOverlay(photo?.crop ?: CropRect.Full, image, { CapturedPhotoStore.setCrop(it) }, c.accent, Modifier.fillMaxSize())
+                else photo?.crop?.let { CropOverlay(it, image, {}, c.accent, Modifier.fillMaxSize(), interactive = false) }
             }
         }
     }
 }
 
+private fun CropRect.toNormalized() = NormalizedRect(left, top, right, bottom)
+private fun NormalizedRect.toCropRect() = CropRect(left, top, right, bottom)
+
 /**
- * Crop rectangle (normalised in the box it fills) with a veil outside and four draggable corner handles.
- * Each handle has a 44 dp touch target; the rectangle keeps at least 15 % of each side.
+ * Crop frame (normalised in the photo area it covers) with a veil outside. Draggable by its four corners, by the
+ * middle of its four edges (visible handles 22-24 dp, touch area 48 dp) and, from inside, as a whole. While a corner
+ * or an edge is dragged, a magnifier shows the photo under the finger at x2. The overlay is larger than the photo
+ * by [HandleInset] on every side so that handles on the photo border can be grabbed entirely; one gesture
+ * detector on the whole overlay does the hit test, so handles moving under the finger cannot disturb the drag.
+ * The logic (hit test, clamping, minimum size) is in [CropDrag].
  */
 @Composable
-private fun CropOverlay(crop: CropRect, onCrop: (CropRect) -> Unit, handle: Color, modifier: Modifier, interactive: Boolean = true) {
+private fun CropOverlay(
+    crop: CropRect,
+    image: ImageBitmap,
+    onCrop: (CropRect) -> Unit,
+    handle: Color,
+    modifier: Modifier,
+    interactive: Boolean = true,
+) {
     val density = LocalDensity.current
-    val touch = 44.dp
-    BoxWithConstraints(modifier) {
-        val wPx = with(density) { maxWidth.toPx() }
-        val hPx = with(density) { maxHeight.toPx() }
-        val current by rememberUpdatedState(crop)
-        Box(
-            Modifier.fillMaxSize().drawBehind {
-                val l = current.left * size.width; val t = current.top * size.height
-                val r = current.right * size.width; val b = current.bottom * size.height
-                drawRect(CropVeil, Offset(0f, 0f), Size(size.width, t))
-                drawRect(CropVeil, Offset(0f, b), Size(size.width, size.height - b))
-                drawRect(CropVeil, Offset(0f, t), Size(l, b - t))
-                drawRect(CropVeil, Offset(r, t), Size(size.width - r, b - t))
+    val insetPx = with(density) { HandleInset.toPx() }
+    val touchRadiusPx = with(density) { (TouchTarget / 2).toPx() }
+    val minSidePx = with(density) { MinFrame.toPx() }
+    val current by rememberUpdatedState(crop)
+    val currentOnCrop by rememberUpdatedState(onCrop)
+    var active by remember { mutableStateOf<CropHandle?>(null) }
+    var overlaySize by remember { mutableStateOf(IntSize.Zero) }
+
+    Box(
+        modifier
+            .onSizeChanged { overlaySize = it }
+            .drawBehind {
+                val ox = insetPx
+                val oy = insetPx
+                val pw = size.width - 2 * insetPx
+                val ph = size.height - 2 * insetPx
+                val l = ox + current.left * pw
+                val t = oy + current.top * ph
+                val r = ox + current.right * pw
+                val b = oy + current.bottom * ph
+                drawRect(CropVeil, Offset(ox, oy), Size(pw, t - oy))
+                drawRect(CropVeil, Offset(ox, b), Size(pw, oy + ph - b))
+                drawRect(CropVeil, Offset(ox, t), Size(l - ox, b - t))
+                drawRect(CropVeil, Offset(r, t), Size(ox + pw - r, b - t))
                 drawRect(CropOutline, Offset(l, t), Size(r - l, b - t), style = Stroke(1.5.dp.toPx()))
-            },
-        )
-        if (!interactive) return@BoxWithConstraints
-        val min = 0.15f
-        fun drag(left: Boolean, top: Boolean, dx: Float, dy: Float) {
-            val cr = current
-            val nx = dx / wPx; val ny = dy / hPx
-            onCrop(
-                CropRect(
-                    left = if (left) (cr.left + nx).coerceIn(0f, cr.right - min) else cr.left,
-                    top = if (top) (cr.top + ny).coerceIn(0f, cr.bottom - min) else cr.top,
-                    right = if (!left) (cr.right + nx).coerceIn(cr.left + min, 1f) else cr.right,
-                    bottom = if (!top) (cr.bottom + ny).coerceIn(cr.top + min, 1f) else cr.bottom,
-                ),
+                if (!interactive) return@drawBehind
+
+                val ring = Stroke(1.5.dp.toPx())
+                fun grow(h: CropHandle) = if (active == h) 1.25f else 1f
+                // Corners: 22 dp discs.
+                for ((h, p) in listOf(
+                    CropHandle.TopLeft to Offset(l, t), CropHandle.TopRight to Offset(r, t),
+                    CropHandle.BottomLeft to Offset(l, b), CropHandle.BottomRight to Offset(r, b),
+                )) {
+                    val radius = 11.dp.toPx() * grow(h)
+                    drawCircle(handle, radius, p)
+                    drawCircle(CropOutline, radius, p, style = ring)
+                }
+                // Edges: 24 x 8 dp pills at the middle of each side.
+                val long = 24.dp.toPx()
+                val short = 8.dp.toPx()
+                val corner = CornerRadius(short / 2)
+                for ((h, p) in listOf(
+                    CropHandle.Top to Offset((l + r) / 2, t), CropHandle.Bottom to Offset((l + r) / 2, b),
+                    CropHandle.Left to Offset(l, (t + b) / 2), CropHandle.Right to Offset(r, (t + b) / 2),
+                )) {
+                    val horizontal = h == CropHandle.Top || h == CropHandle.Bottom
+                    val s = grow(h)
+                    val size2 = if (horizontal) Size(long * s, short * s) else Size(short * s, long * s)
+                    val topLeft = Offset(p.x - size2.width / 2, p.y - size2.height / 2)
+                    drawRoundRect(handle, topLeft, size2, corner)
+                    drawRoundRect(CropOutline, topLeft, size2, corner, style = ring)
+                }
+            }
+            .then(
+                if (!interactive) Modifier
+                else Modifier.pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val pw = size.width - 2 * insetPx
+                        val ph = size.height - 2 * insetPx
+                        if (pw <= 0f || ph <= 0f) return@awaitEachGesture
+                        var rect = current.toNormalized()
+                        val grabbed = CropDrag.hitTest(rect, down.position.x - insetPx, down.position.y - insetPx, pw, ph, touchRadiusPx)
+                            ?: return@awaitEachGesture
+                        down.consume()
+                        active = grabbed
+                        try {
+                            val minW = CropDrag.minimumSize(pw, minSidePx)
+                            val minH = CropDrag.minimumSize(ph, minSidePx)
+                            drag(down.id) { change ->
+                                val delta = change.positionChange()
+                                change.consume()
+                                rect = CropDrag.drag(rect, grabbed, delta.x / pw, delta.y / ph, minW, minH)
+                                currentOnCrop(rect.toCropRect())
+                            }
+                        } finally {
+                            active = null
+                        }
+                    }
+                },
+            ),
+    ) {
+        val grabbed = active
+        if (interactive && grabbed != null && grabbed != CropHandle.Move && overlaySize.width > 0) {
+            val (fx, fy) = CropDrag.focusPoint(current.toNormalized(), grabbed)
+            Loupe(image, fx, fy, overlaySize.width.toFloat(), overlaySize.height.toFloat(), insetPx)
+        }
+    }
+}
+
+/**
+ * Round magnifier (96 dp, x2) showing the photo around ([fx], [fy]) (0..1 of the photo area). It sits above the
+ * finger, or below when there is no room above, and stays inside the overlay of size [overlayW] x [overlayH] px.
+ */
+@Composable
+private fun Loupe(image: ImageBitmap, fx: Float, fy: Float, overlayW: Float, overlayH: Float, insetPx: Float) {
+    val density = LocalDensity.current
+    val loupePx = with(density) { LoupeSize.toPx() }
+    val gapPx = with(density) { 44.dp.toPx() }
+    val photoW = overlayW - 2 * insetPx
+    val photoH = overlayH - 2 * insetPx
+    val px = insetPx + fx * photoW
+    val py = insetPx + fy * photoH
+    val x = (px - loupePx / 2).coerceIn(0f, max(0f, overlayW - loupePx))
+    val above = py - gapPx - loupePx
+    val y = (if (above >= 0f) above else py + gapPx).coerceIn(0f, max(0f, overlayH - loupePx))
+    Box(
+        Modifier
+            .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
+            .size(LoupeSize)
+            .clip(CircleShape)
+            .background(PhotoBackdrop)
+            .border(2.dp, CropOutline, CircleShape),
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            // The whole photo drawn at twice its on-screen size, shifted so that the focus is at the centre.
+            drawImage(
+                image,
+                dstOffset = IntOffset((size.width / 2 - 2 * fx * photoW).roundToInt(), (size.height / 2 - 2 * fy * photoH).roundToInt()),
+                dstSize = IntSize((2 * photoW).roundToInt(), (2 * photoH).roundToInt()),
             )
+            val centre = Offset(size.width / 2, size.height / 2)
+            drawCircle(CropOutline, 7.dp.toPx(), centre, style = Stroke(1.5.dp.toPx()))
+            drawCircle(LoupeDot, 1.5.dp.toPx(), centre)
         }
-        @Composable
-        fun Handle(left: Boolean, top: Boolean) {
-            val cx = (if (left) crop.left else crop.right) * wPx
-            val cy = (if (top) crop.top else crop.bottom) * hPx
-            val half = with(density) { touch.toPx() / 2 }
-            Box(
-                Modifier
-                    .offset { IntOffset((cx - half).roundToInt(), (cy - half).roundToInt()) }
-                    .size(touch)
-                    .pointerInput(left, top) {
-                        detectDragGestures { change, amount -> change.consume(); drag(left, top, amount.x, amount.y) }
-                    },
-                contentAlignment = Alignment.Center,
-            ) { Box(Modifier.size(22.dp).background(handle, CircleShape)) }
-        }
-        Handle(true, true); Handle(false, true); Handle(true, false); Handle(false, false)
     }
 }
 
