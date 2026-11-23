@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
+import android.view.View
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,6 +16,7 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview as CameraPreview
+import androidx.camera.core.UseCaseGroup
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Column
@@ -270,10 +272,25 @@ private fun LiveViewfinder(imageCapture: ImageCapture, modifier: Modifier) {
             val p = future.get()
             provider = p
             val preview = CameraPreview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
-            runCatching {
-                p.unbindAll()
-                p.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
+            // The view port makes the captured JPEG cover exactly what the (FILL_CENTER) preview shows.
+            // It is only known once the view is laid out.
+            fun bind() {
+                runCatching {
+                    val group = UseCaseGroup.Builder().addUseCase(preview).addUseCase(imageCapture)
+                    previewView.viewPort?.let { group.setViewPort(it) }
+                    p.unbindAll()
+                    p.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, group.build())
+                }
             }
+            if (previewView.viewPort != null) bind()
+            else previewView.addOnLayoutChangeListener(object : View.OnLayoutChangeListener {
+                override fun onLayoutChange(v: View?, l: Int, t: Int, r: Int, b: Int, ol: Int, ot: Int, or: Int, ob: Int) {
+                    if (previewView.viewPort != null) {
+                        previewView.removeOnLayoutChangeListener(this)
+                        bind()
+                    }
+                }
+            })
         }, ContextCompat.getMainExecutor(context))
         onDispose { provider?.unbindAll() }
     }

@@ -5,6 +5,20 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +51,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
@@ -203,6 +218,9 @@ private fun Modifier.dashedBorder(color: Color, width: Dp): Modifier = drawBehin
     )
 }
 
+private const val MAX_ZOOM = 5f
+private const val DOUBLE_TAP_SCALE = 2.5f
+
 /** Smallest touch target, also for tiny zones (a cell of a 31-day schedule). */
 private val MIN_TOUCH = 44.dp
 
@@ -223,7 +241,60 @@ private fun RealPhotoView(photo: Bitmap, slots: List<Slot>, onOpen: (String) -> 
         BoxWithConstraints(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(ScenePaper.Table)) {
             val w = maxWidth
             val h = w * photo.height / photo.width
-            Box(Modifier.fillMaxWidth().height(h)) {
+            val density = LocalDensity.current
+            val viewW = with(density) { w.toPx() }
+            val viewH = with(density) { h.toPx() }
+            var scale by remember { mutableFloatStateOf(1f) }
+            var shift by remember { mutableStateOf(Offset.Zero) }
+            // Keeps the zoomed photo covering the viewport (no empty margin at the edges).
+            fun clamp(o: Offset, s: Float) = Offset(o.x.coerceIn(viewW * (1 - s), 0f), o.y.coerceIn(viewH * (1 - s), 0f))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(h)
+                    .pointerInput(viewW, viewH) {
+                        detectTapGestures(onDoubleTap = { tap ->
+                            if (scale > 1.01f) {
+                                scale = 1f
+                                shift = Offset.Zero
+                            } else {
+                                scale = DOUBLE_TAP_SCALE
+                                shift = clamp(tap - tap * DOUBLE_TAP_SCALE, DOUBLE_TAP_SCALE)
+                            }
+                        })
+                    }
+                    .pointerInput(viewW, viewH) {
+                        // Pinch always; a one-finger drag only while zoomed, so the page still scrolls at 1x.
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            do {
+                                val event = awaitPointerEvent()
+                                val fingers = event.changes.count { it.pressed }
+                                if (fingers > 1 || scale > 1.001f) {
+                                    val zoom = event.calculateZoom()
+                                    val pan = event.calculatePan()
+                                    val centroid = event.calculateCentroid(useCurrent = false)
+                                    if (zoom != 1f || pan != Offset.Zero) {
+                                        val newScale = (scale * zoom).coerceIn(1f, MAX_ZOOM)
+                                        val anchored = if (centroid.isSpecified) centroid - (centroid - shift) / scale * newScale else shift
+                                        scale = newScale
+                                        shift = clamp(anchored + pan, newScale)
+                                        event.changes.forEach { if (it.positionChanged()) it.consume() }
+                                    }
+                                }
+                            } while (event.changes.any { it.pressed })
+                        }
+                    },
+            ) {
+              Box(
+                Modifier.fillMaxSize().graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    translationX = shift.x
+                    translationY = shift.y
+                    transformOrigin = TransformOrigin(0f, 0f)
+                },
+              ) {
                 Image(
                     bitmap = image,
                     contentDescription = photoCd,
@@ -248,6 +319,7 @@ private fun RealPhotoView(photo: Bitmap, slots: List<Slot>, onOpen: (String) -> 
                             .size(touchW, touchH),
                     )
                 }
+              }
             }
         }
         Text(stringResource(R.string.results_photo_hint), style = CalEventTheme.type.secondary, color = CalEventTheme.colors.ink2)
