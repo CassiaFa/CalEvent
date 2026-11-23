@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import fr.calevent.app.R
 import fr.calevent.app.data.FakeData
 import fr.calevent.app.ui.ScanUiState
+import fr.calevent.app.ui.PhotoTurn
 import fr.calevent.app.ui.ScanViewModel
 import fr.calevent.app.ui.components.Banner
 import fr.calevent.app.ui.components.BannerKind
@@ -78,6 +79,7 @@ fun ResultsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val photo by viewModel.photoBitmap.collectAsState()
+    val turn by viewModel.photoTurn.collectAsState()
     ResultsContent(
         state = state,
         onBack = onBack,
@@ -94,6 +96,7 @@ fun ResultsScreen(
         onDefineCode = onDefineCode,
         onSetMe = onSetMe,
         photo = photo,
+        turn = turn,
     )
 }
 
@@ -112,6 +115,7 @@ internal fun ResultsContent(
     onDefineCode: (String) -> Unit = {},
     onSetMe: (String?) -> Unit = {},
     photo: Bitmap? = null,
+    turn: PhotoTurn = PhotoTurn.None,
     initialTab: Int = 0,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(initialTab) }
@@ -254,6 +258,7 @@ internal fun ResultsContent(
             onUpdate = onUpdate,
             onDefineCode = onDefineCode,
             photo = photo,
+            turn = turn,
         )
     }
     if (pickingPerson) {
