@@ -23,7 +23,7 @@ import fr.calevent.app.ui.components.PrimaryButton
 import fr.calevent.app.ui.components.SecondaryButton
 import fr.calevent.app.ui.components.TertiaryButton
 import fr.calevent.app.ui.components.IconActionButton
-import fr.calevent.core.sameName
+import fr.calevent.core.findPerson
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -126,7 +126,7 @@ internal fun PersonSheet(
     var query by remember { mutableStateOf("") }
     val key = query.foldKey()
     val matching = remember(people, key) { if (key.isEmpty()) people else people.filter { it.foldKey().contains(key) } }
-    val meName = people.firstOrNull { sameName(it, me) }
+    val meName = remember(people, me) { findPerson(people, me) }
     val mine = matching.filter { it == meName }
     val others = matching.filter { it != meName }
     ModalBottomSheet(
@@ -158,7 +158,7 @@ internal fun PersonSheet(
                 }
             }
             if (selected != null) {
-                if (sameName(selected, me)) {
+                if (selected != null && selected == meName) {
                     TertiaryButton(stringResource(R.string.results_people_not_me), onClick = { onSetMe(null) }, modifier = Modifier.fillMaxWidth())
                 } else {
                     PrimaryButton(stringResource(R.string.results_people_its_me), onClick = { onSetMe(selected) }, modifier = Modifier.fillMaxWidth())

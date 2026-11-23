@@ -96,8 +96,9 @@
     <string name="settings_license_ofl">SIL Open Font License 1.1</string>
     <string name="settings_me_unset">Non défini</string>
     <string name="settings_me_title">Mon nom dans les plannings</string>
-    <string name="settings_me_hint">Ce nom, tel qu\'il apparaît dans le tableau, est présélectionné quand il est trouvé. Il reste sur ce téléphone.</string>
+    <string name="settings_me_hint">Votre nom et votre prénom servent à présélectionner votre ligne quand elle est trouvée dans le tableau (« NOM Prénom », « Prénom N. », « NOM »…). Si plusieurs personnes correspondent, rien n\'est présélectionné. Ces informations restent sur ce téléphone.</string>
     <string name="settings_me_field">Nom</string>
+    <string name="settings_me_field_first">Prénom</string>
     <string name="settings_me_save">Enregistrer</string>
     <string name="settings_me_clear">Effacer</string>
 </resources>

@@ -17,15 +17,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
@@ -44,6 +43,7 @@ import fr.calevent.app.ui.components.PrimaryButton
 import fr.calevent.app.ui.icons.CalEventIcons
 import fr.calevent.app.ui.theme.CalEventTheme
 import fr.calevent.app.ui.theme.ThemeMode
+import kotlinx.coroutines.launch
 
 private const val PAGES = 3
 
@@ -55,10 +55,12 @@ private const val PAGES = 3
 fun OnboardingScreen(onFinish: () -> Unit) {
     val c = CalEventTheme.colors
     val t = CalEventTheme.type
-    var page by rememberSaveable { mutableIntStateOf(0) }
-    BackHandler(enabled = page > 0) { page-- }
+    val pagerState = rememberPagerState(pageCount = { PAGES })
+    val scope = rememberCoroutineScope()
+    val page = pagerState.currentPage
+    BackHandler(enabled = page > 0) { scope.launch { pagerState.animateScrollToPage(page - 1) } }
     val last = page == PAGES - 1
-    val pageCd = stringResource(R.string.onb_page_cd, page + 1, PAGES)
+    val pageCd = stringResource(R.string.onb_dots_cd, page + 1, PAGES)
     Box(Modifier.fillMaxSize().background(c.bg)) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
@@ -68,23 +70,26 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                     }
                 }
             }
-            Box(Modifier.padding(horizontal = 24.dp).fillMaxWidth().height(360.dp)) {
-                when (page) {
-                    0 -> HowItWorksVisual()
-                    1 -> OfflineVisual()
-                    else -> PermissionsVisual()
+            HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { index ->
+                Column(Modifier.fillMaxSize()) {
+                    Box(Modifier.padding(horizontal = 24.dp).fillMaxWidth().height(360.dp)) {
+                        when (index) {
+                            0 -> HowItWorksVisual()
+                            1 -> OfflineVisual()
+                            else -> PermissionsVisual()
+                        }
+                    }
+                    val (title, body) = when (index) {
+                        0 -> R.string.onb_1_title to R.string.onb_1_body
+                        1 -> R.string.onb_2_title to R.string.onb_2_body
+                        else -> R.string.onb_3_title to R.string.onb_3_body
+                    }
+                    Column(Modifier.padding(start = 28.dp, end = 28.dp, top = 28.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(stringResource(title), style = t.title.copy(fontSize = 26.sp), color = c.ink, modifier = Modifier.semantics { heading() })
+                        Text(stringResource(body), style = t.body, color = c.ink2)
+                    }
                 }
             }
-            val (title, body) = when (page) {
-                0 -> R.string.onb_1_title to R.string.onb_1_body
-                1 -> R.string.onb_2_title to R.string.onb_2_body
-                else -> R.string.onb_3_title to R.string.onb_3_body
-            }
-            Column(Modifier.padding(start = 28.dp, end = 28.dp, top = 28.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(stringResource(title), style = t.title.copy(fontSize = 26.sp), color = c.ink, modifier = Modifier.semantics { heading() })
-                Text(stringResource(body), style = t.body, color = c.ink2)
-            }
-            Box(Modifier.weight(1f))
             Column(Modifier.navigationBarsPadding().padding(start = 20.dp, end = 20.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
                 Row(
                     Modifier.fillMaxWidth().semantics { contentDescription = pageCd },
@@ -96,7 +101,7 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                 }
                 PrimaryButton(
                     text = stringResource(if (last) R.string.onb_start else R.string.onb_continue),
-                    onClick = { if (last) onFinish() else page++ },
+                    onClick = { if (last) onFinish() else scope.launch { pagerState.animateScrollToPage(page + 1) } },
                     tall = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
