@@ -11,6 +11,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import fr.calevent.core.sameName
 import fr.calevent.core.UserDecision
 import kotlinx.coroutines.launch
 import android.graphics.Bitmap
@@ -182,8 +183,12 @@ internal fun ResultsContent(
                 Text(subtitle, style = CalEventTheme.type.secondary, color = CalEventTheme.colors.ink2)
             }
             state.warnings.forEach { WarningBanner(it, onRotate) }
-            if (state.unknownCodes.isNotEmpty()) {
-                val codes = state.unknownCodes
+            // Team schedules: only the codes of the selected person count (nobody selected, none).
+            val codes = remember(slots, state.people, state.selectedPerson) {
+                val shown = if (state.people.isEmpty()) slots else slots.filter { sameName(it.person, state.selectedPerson) }
+                shown.mapNotNull { it.unknownCode }.distinctBy { it.uppercase() }
+            }
+            if (codes.isNotEmpty()) {
                 val shown = codes.take(3).joinToString(", ") + if (codes.size > 3) "…" else ""
                 Banner(
                     kind = BannerKind.Review,
