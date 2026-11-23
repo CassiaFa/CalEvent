@@ -44,13 +44,27 @@ object OcrPreprocess {
         height: Int,
         sigmaRatio: Double = DEFAULT_SIGMA_RATIO,
         lineLengthRatio: Double = DEFAULT_LINE_LENGTH_RATIO,
-    ): IntArray {
+    ): IntArray = prepare(gray, width, height, sigmaRatio, lineLengthRatio, detectGrid = false).pixels
+
+    /** Cleaned image ([process]) and, when [detectGrid], the table grid found before the lines are erased. */
+    class Prepared(val pixels: IntArray, val width: Int, val height: Int, val grid: TableGrid?)
+
+    /** Same as [process], plus the ruled grid of a table ([GridDetector]) found on the background-divided image. */
+    fun prepare(
+        gray: IntArray,
+        width: Int,
+        height: Int,
+        sigmaRatio: Double = DEFAULT_SIGMA_RATIO,
+        lineLengthRatio: Double = DEFAULT_LINE_LENGTH_RATIO,
+        detectGrid: Boolean = true,
+    ): Prepared {
         require(width > 0 && height > 0 && gray.size == width * height) { "bad image size" }
         val longSide = max(width, height)
         val flat = divideByBackground(gray, width, height, sigmaRatio * longSide)
+        val grid = if (detectGrid) GridDetector.detect(flat, width, height) else null
         val lineLength = max(MIN_LINE_LENGTH, (lineLengthRatio * longSide).roundToInt())
         eraseLines(flat, width, height, lineLength)
-        return flat
+        return Prepared(flat, width, height, grid)
     }
 
     // ---- 1. background division ---------------------------------------------------------------------------
