@@ -4,6 +4,10 @@ import fr.calevent.core.ShiftCodeTable
 import fr.calevent.core.Slot
 import fr.calevent.core.SlotStatus
 import fr.calevent.core.TeamSchedule
+import kotlin.math.min
+
+/** Highest confidence of a slot with a written doubt: "À revoir". */
+private const val DOUBT_CEILING = SlotStatus.KEPT_THRESHOLD - 0.01
 
 internal const val REASON_LOW_OCR = "Texte peu lisible"
 internal const val REASON_TIME_CORRECTED = "Heure peut-être mal lue"
@@ -19,20 +23,28 @@ internal const val DEFAULT_WORK_TITLE = "Travail"
 internal const val DEFAULT_EVENT_TITLE = "Événement"
 
 /**
- * Explainable confidence: OCR confidence multiplied by one factor per doubt, each with its
- * French reason. The first reason is the one shown to the user.
+ * Explainable confidence: OCR confidence ([OcrConfidence]) multiplied by one factor per doubt, each with its
+ * French reason. The first reason is the one shown to the user. A doubt keeps the slot out of "Retenu",
+ * however good the text: the confidence is capped just below the "kept" threshold. Exception: a [soft] doubt
+ * (a letter read as a digit in a time, "8h3O") only lowers the confidence, so clear text stays kept.
  */
 internal class Evidence(private val ocr: Double) {
     private var factor = 1.0
+    private var capped = false
     private val reasons = ArrayList<String>()
 
-    fun penalize(f: Double, reason: String): Evidence {
+    fun penalize(f: Double, reason: String, soft: Boolean = false): Evidence {
         factor *= f
+        if (!soft) capped = true
         if (reason !in reasons) reasons += reason
         return this
     }
 
-    val confidence: Double get() = (ocr * factor).coerceIn(0.0, 1.0)
+    val confidence: Double
+        get() {
+            val c = (ocr * factor).coerceIn(0.0, 1.0)
+            return if (capped) min(c, DOUBT_CEILING) else c
+        }
 
     fun reason(dateReason: String?): String? =
         dateReason ?: reasons.firstOrNull() ?: REASON_LOW_OCR.takeIf { ocr < SlotStatus.KEPT_THRESHOLD }
@@ -75,7 +87,7 @@ internal fun buildSlots(
 ): List<Slot> {
     val day = date.date ?: return emptyList()
     val timed = parseTimes(text)
-    val ocr = tokens.minOfOrNull { it.confidence } ?: DEFAULT_OCR_CONFIDENCE
+    val ocr = OcrConfidence.of(tokens)
     val region = regionOf(tokens, ctx.image.width, ctx.image.height)
     val rest = timed.rest
     val title = rest.ifEmpty { if (team) DEFAULT_WORK_TITLE else DEFAULT_EVENT_TITLE }
@@ -83,7 +95,7 @@ internal fun buildSlots(
     fun make(index: Int, range: TimeRange?): Slot {
         val ev = Evidence(ocr)
         penalties.forEach { (f, r) -> ev.penalize(f, r) }
-        if (timed.corrected) ev.penalize(0.9, REASON_TIME_CORRECTED)
+        if (timed.corrected) ev.penalize(0.9, REASON_TIME_CORRECTED, soft = true)
         if (range == null) ev.penalize(0.75, REASON_NO_TIME)
         else if (range.end == null && (timed.missingEnd || team)) ev.penalize(0.75, REASON_END_UNCERTAIN)
         if (rest.isEmpty() && !team) ev.penalize(0.85, REASON_NO_TITLE)

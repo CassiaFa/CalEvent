@@ -200,7 +200,7 @@ private fun analyzeTeam(
         val day = date.date ?: return@forEach
         val (_, block, dy) = items.minBy { it.third }
         val (code, corrected) = fixCode(block.text, ctx.codes)
-        val ev = Evidence(block.tokens.minOf { it.confidence })
+        val ev = Evidence(OcrConfidence.of(block.tokens))
         penalties(block.dxRatio, dy, items.size > 1).forEach { (f, r) -> ev.penalize(f, r) }
         if (corrected) ev.penalize(0.9, REASON_CODE_CORRECTED)
         // TeamSchedule has no "uncertain date" flag: keep such cells below the "kept" threshold.
