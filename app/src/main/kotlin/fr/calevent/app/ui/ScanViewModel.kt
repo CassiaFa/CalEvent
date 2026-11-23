@@ -145,6 +145,11 @@ class ScanViewModel : ViewModel() {
     /** Image the current slots were read on (their regions are fractions of it); null with fake data. */
     val photoBitmap: StateFlow<Bitmap?> = _photoBitmap.asStateFlow()
 
+    private val _photoTurn = MutableStateFlow(PhotoTurn.None)
+
+    /** How to turn [photoBitmap] to read it upright (from the parser); [PhotoTurn.None] with fake data. */
+    val photoTurn: StateFlow<PhotoTurn> = _photoTurn.asStateFlow()
+
     private val _uiState = MutableStateFlow(
         ScanUiState(
             slots = FakeData.weeklySlots,
@@ -352,6 +357,7 @@ class ScanViewModel : ViewModel() {
                 }
                 val result = out.result
                 _photoBitmap.value = out.bitmap
+                _photoTurn.value = PhotoTurn(result.rotationDegrees, result.skewDegrees)
                 val failed = ParseWarning.NO_SLOTS in result.warnings
                 val team = result.kind.isTeam
                 val preselected = if (team) findPerson(result.people, settings.me) else null
@@ -448,4 +454,9 @@ class ScanViewModel : ViewModel() {
     private companion object {
         const val KEY_LAST_CALENDAR = "last_calendar_id"
     }
+}
+
+/** Clockwise [rotationDegrees] (0/90/180/270) that makes the analysed photo upright, then the remaining row tilt. */
+data class PhotoTurn(val rotationDegrees: Int, val skewDegrees: Double) {
+    companion object { val None = PhotoTurn(0, 0.0) }
 }

@@ -59,6 +59,7 @@ import fr.calevent.app.ui.icons.CalEventIcons
 import fr.calevent.app.ui.theme.CalEventTheme
 import fr.calevent.app.ui.theme.ThemeMode
 import fr.calevent.core.Region
+import fr.calevent.app.ui.PhotoTurn
 import fr.calevent.core.Slot
 import fr.calevent.core.SlotStatus
 import java.time.LocalDate
@@ -85,7 +86,7 @@ internal fun Slot.withTimes(start: LocalTime?, end: LocalTime?): Slot =
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun SlotSheet(slot: Slot, onDismiss: () -> Unit, onUpdate: (Slot) -> Unit, photo: Bitmap? = null, onDefineCode: ((String) -> Unit)? = null) {
+internal fun SlotSheet(slot: Slot, onDismiss: () -> Unit, onUpdate: (Slot) -> Unit, photo: Bitmap? = null, turn: PhotoTurn = PhotoTurn.None, onDefineCode: ((String) -> Unit)? = null) {
     val c = CalEventTheme.colors
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
@@ -97,13 +98,13 @@ internal fun SlotSheet(slot: Slot, onDismiss: () -> Unit, onUpdate: (Slot) -> Un
         scrimColor = c.scrim,
         dragHandle = { BottomSheetDefaults.DragHandle(color = c.line) },
     ) {
-        SlotSheetContent(slot = slot, onUpdate = onUpdate, onClose = onDismiss, photo = photo, onDefineCode = onDefineCode?.let { f -> { code -> onDismiss(); f(code) } })
+        SlotSheetContent(slot = slot, onUpdate = onUpdate, onClose = onDismiss, photo = photo, turn = turn, onDefineCode = onDefineCode?.let { f -> { code -> onDismiss(); f(code) } })
     }
 }
 
 /** Content of the sheet, separate from the Material container so that it can be previewed. */
 @Composable
-internal fun SlotSheetContent(slot: Slot, onUpdate: (Slot) -> Unit, onClose: () -> Unit, photo: Bitmap? = null, onDefineCode: ((String) -> Unit)? = null) {
+internal fun SlotSheetContent(slot: Slot, onUpdate: (Slot) -> Unit, onClose: () -> Unit, photo: Bitmap? = null, turn: PhotoTurn = PhotoTurn.None, onDefineCode: ((String) -> Unit)? = null) {
     val c = CalEventTheme.colors
     // Text being typed lives here; the slot is only replaced when the text is valid.
     var title by remember(slot.id) { mutableStateOf(slot.title) }
@@ -136,7 +137,7 @@ internal fun SlotSheetContent(slot: Slot, onUpdate: (Slot) -> Unit, onClose: () 
             Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(top = 6.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            SourceCrop(slot, photo)
+            SourceCrop(slot, photo, turn)
             if (status != SlotStatus.KEPT && slot.reviewReason != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(CalEventIcons.Warning, contentDescription = null, tint = c.review, modifier = Modifier.size(18.dp))
@@ -290,7 +291,7 @@ private fun FieldError(text: String) {
 
 /** Fake cropped extract of the photo around the slot, with the text read there. */
 @Composable
-private fun SourceCrop(slot: Slot, photo: Bitmap?) {
+private fun SourceCrop(slot: Slot, photo: Bitmap?, turn: PhotoTurn) {
     val c = CalEventTheme.colors
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
@@ -298,7 +299,7 @@ private fun SourceCrop(slot: Slot, photo: Bitmap?) {
             style = CalEventTheme.type.label.copy(fontSize = 12.sp),
             color = c.ink2,
         )
-        val crop = remember(photo, slot.region) { cropAround(photo, slot.region) }
+        val crop = remember(photo, slot.region, turn) { cropAround(photo, slot.region, turn) }
         if (crop != null) {
             val cropCd = stringResource(R.string.slot_crop_cd)
             Image(
@@ -339,7 +340,7 @@ private fun SourceCrop(slot: Slot, photo: Bitmap?) {
 }
 
 /** The part of [photo] around [region] (with a small margin), or null when either is missing. */
-private fun cropAround(photo: Bitmap?, region: Region?): Bitmap? {
+private fun cropAround(photo: Bitmap?, region: Region?, turn: PhotoTurn = PhotoTurn.None): Bitmap? {
     if (photo == null || region == null) return null
     val marginX = (region.right - region.left) * 0.15 + 0.005
     val marginY = (region.bottom - region.top) * 0.4 + 0.005
@@ -347,7 +348,13 @@ private fun cropAround(photo: Bitmap?, region: Region?): Bitmap? {
     val y = ((region.top - marginY).coerceAtLeast(0.0) * photo.height).toInt().coerceIn(0, photo.height - 1)
     val right = ((region.right + marginX).coerceAtMost(1.0) * photo.width).toInt().coerceIn(x + 1, photo.width)
     val bottom = ((region.bottom + marginY).coerceAtMost(1.0) * photo.height).toInt().coerceIn(y + 1, photo.height)
-    return runCatching { Bitmap.createBitmap(photo, x, y, right - x, bottom - y) }.getOrNull()
+    // The parser works in the upright frame: turn the extract by the parse rotation, minus the row tilt.
+    val skew = if (kotlin.math.abs(turn.skewDegrees) < 0.3) 0.0 else turn.skewDegrees
+    val degrees = turn.rotationDegrees - skew.toFloat()
+    return runCatching {
+        if (degrees == 0f) Bitmap.createBitmap(photo, x, y, right - x, bottom - y)
+        else Bitmap.createBitmap(photo, x, y, right - x, bottom - y, android.graphics.Matrix().apply { postRotate(degrees) }, true)
+    }.getOrNull()
 }
 
 /** Dashed outline around the text that raised doubts (style, not colour alone: it is also written below). */
