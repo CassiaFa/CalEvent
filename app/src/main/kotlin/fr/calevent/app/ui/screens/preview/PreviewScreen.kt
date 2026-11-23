@@ -111,21 +111,29 @@ fun PreviewScreen(viewModel: ScanViewModel, onBack: () -> Unit, onNext: () -> Un
     val c = CalEventTheme.colors
     val t = CalEventTheme.type
     val photo by CapturedPhotoStore.photo.collectAsState()
-    var cropping by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
-    val uri = photo?.uri
+    // Everything below is keyed by the photo id (new for every capture or import) so a new photo never inherits
+    // the state of the previous one.
+    val photoId = photo?.id
     val turns = photo?.quarterTurns ?: 0
-    // Automatic pre-crop: OCR on a reduced bitmap, applied only if the user has not set a crop meanwhile.
-    var searching by remember { mutableStateOf(false) }
-    var autoApplied by rememberSaveable(uri.toString(), turns) { mutableStateOf(false) }
-    LaunchedEffect(uri, turns) {
-        if (uri == null || CapturedPhotoStore.isAutoCropDone(uri, turns)) return@LaunchedEffect
-        val snapshot = CapturedPhotoStore.photo.value?.takeIf { it.uri == uri && it.quarterTurns == turns } ?: return@LaunchedEffect
-        searching = true
-        val suggestion = try { AutoCrop.suggest(context, snapshot) } finally { searching = false }
-        CapturedPhotoStore.markAutoCropDone(uri, turns)
+    var cropping by rememberSaveable(photoId) { mutableStateOf(false) }
+    var autoApplied by rememberSaveable(photoId, turns) { mutableStateOf(false) }
+    // (photo id, rotation) of the running automatic search; a cancelled search of an older photo cannot clear it.
+    var searchingFor by remember { mutableStateOf<Pair<Long, Int>?>(null) }
+    val searching = searchingFor != null
+    // Automatic pre-crop: table grid (or recognised text) on a reduced bitmap, applied only if the user has not
+    // set a crop meanwhile. Restarts for every new photo or rotation, never for a photo already searched.
+    LaunchedEffect(photoId, turns) {
+        val snapshot = CapturedPhotoStore.photo.value ?: return@LaunchedEffect
+        if (snapshot.id != photoId || snapshot.quarterTurns != turns || CapturedPhotoStore.isAutoCropDone(snapshot)) return@LaunchedEffect
+        val key = snapshot.id to snapshot.quarterTurns
+        searchingFor = key
+        val suggestion = try { AutoCrop.suggest(context, snapshot) } finally { if (searchingFor == key) searchingFor = null }
         val now = CapturedPhotoStore.photo.value
-        if (suggestion != null && now?.uri == uri && now.quarterTurns == turns && now.crop == null) {
+        // The photo was replaced, cleared or rotated meanwhile: this result is stale.
+        if (now == null || now.id != snapshot.id || now.quarterTurns != snapshot.quarterTurns) return@LaunchedEffect
+        CapturedPhotoStore.markAutoCropDone(now)
+        if (suggestion != null && now.crop == null) {
             CapturedPhotoStore.setCrop(suggestion)
             cropping = true
             autoApplied = true
@@ -209,7 +217,7 @@ private fun PhotoViewport(photo: CapturedPhoto?, cropping: Boolean, modifier: Mo
     var failed by remember { mutableStateOf(false) }
     val uri = photo?.uri
     val turns = photo?.quarterTurns ?: 0
-    LaunchedEffect(uri, turns) {
+    LaunchedEffect(photo?.id, uri, turns) {
         if (uri == null) { bitmap = null; return@LaunchedEffect }
         failed = false
         bitmap = runCatching { CapturedPhotoStore.loadBitmap(context, maxSide = 1600, applyCrop = false) }.getOrElse { failed = true; null }
