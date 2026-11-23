@@ -97,6 +97,10 @@ object CapturedPhotoStore {
         decode(photo, maxSide, applyCrop)
     }
 
+    /** Same as [loadBitmap] for a given [photo] snapshot, so a long job keeps working on the photo it started with. */
+    suspend fun loadBitmapOf(photo: CapturedPhoto, maxSide: Int = 2048, applyCrop: Boolean = true): Bitmap =
+        withContext(Dispatchers.IO) { decode(photo, maxSide, applyCrop) }
+
     private fun decode(photo: CapturedPhoto, maxSide: Int, applyCrop: Boolean): Bitmap {
         val file = File(requireNotNull(photo.uri.path) { "Bad photo uri" })
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }

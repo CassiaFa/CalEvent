@@ -100,8 +100,9 @@ fun PreviewScreen(viewModel: ScanViewModel, onBack: () -> Unit, onNext: () -> Un
     var autoApplied by rememberSaveable(uri.toString(), turns) { mutableStateOf(false) }
     LaunchedEffect(uri, turns) {
         if (uri == null || CapturedPhotoStore.isAutoCropDone(uri, turns)) return@LaunchedEffect
+        val snapshot = CapturedPhotoStore.photo.value?.takeIf { it.uri == uri && it.quarterTurns == turns } ?: return@LaunchedEffect
         searching = true
-        val suggestion = try { AutoCrop.suggest(context) } finally { searching = false }
+        val suggestion = try { AutoCrop.suggest(context, snapshot) } finally { searching = false }
         CapturedPhotoStore.markAutoCropDone(uri, turns)
         val now = CapturedPhotoStore.photo.value
         if (suggestion != null && now?.uri == uri && now.quarterTurns == turns && now.crop == null) {
