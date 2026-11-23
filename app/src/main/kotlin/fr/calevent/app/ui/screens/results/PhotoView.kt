@@ -302,21 +302,12 @@ private fun RealPhotoView(photo: Bitmap, slots: List<Slot>, onOpen: (String) -> 
                     modifier = Modifier.fillMaxSize(),
                 )
                 withZone.forEach { slot ->
-                    val r = slot.region!!
-                    val zoneW = w * (r.right - r.left).toFloat()
-                    val zoneH = h * (r.bottom - r.top).toFloat()
-                    val touchW = maxOf(zoneW, MIN_TOUCH)
-                    val touchH = maxOf(zoneH, MIN_TOUCH)
-                    val cx = w * ((r.left + r.right) / 2).toFloat()
-                    val cy = h * ((r.top + r.bottom) / 2).toFloat()
                     PhotoZone(
                         slot = slot,
-                        zoneWidth = zoneW,
-                        zoneHeight = zoneH,
+                        imageW = w,
+                        imageH = h,
+                        zoom = scale,
                         onClick = { onOpen(slot.id) },
-                        modifier = Modifier
-                            .offset(x = (cx - touchW / 2).coerceIn(0.dp, (w - touchW).coerceAtLeast(0.dp)), y = (cy - touchH / 2).coerceIn(0.dp, (h - touchH).coerceAtLeast(0.dp)))
-                            .size(touchW, touchH),
                     )
                 }
               }
@@ -334,8 +325,14 @@ private fun RealPhotoView(photo: Bitmap, slots: List<Slot>, onOpen: (String) -> 
     }
 }
 
+/**
+ * One zone, laid out in the same image-sized coordinate space as the photo (inside the zoom layer):
+ * outline + faint fill at the exact region, an invisible >= 44 dp touch box centred on it, and the
+ * status badge anchored to the zone's top-right corner and counter-scaled by [zoom] to stay constant on screen.
+ */
 @Composable
-private fun PhotoZone(slot: Slot, zoneWidth: Dp, zoneHeight: Dp, onClick: () -> Unit, modifier: Modifier) {
+private fun PhotoZone(slot: Slot, imageW: Dp, imageH: Dp, zoom: Float, onClick: () -> Unit) {
+    val r = slot.region ?: return
     val c = CalEventTheme.colors
     val (fg, tint, icon) = when (slot.status) {
         SlotStatus.KEPT -> Triple(c.kept, c.keptBg, CalEventIcons.Check)
@@ -351,23 +348,44 @@ private fun PhotoZone(slot: Slot, zoneWidth: Dp, zoneHeight: Dp, onClick: () -> 
     )
     val description = stringResource(R.string.results_zone_cd, statusLabel, slot.date.format(DAY_FORMAT) + " " + slotTimeText(slot), slot.title)
     val shape = RoundedCornerShape(4.dp)
+    val left = imageW * r.left.toFloat()
+    val top = imageH * r.top.toFloat()
+    val zoneW = imageW * (r.right - r.left).toFloat()
+    val zoneH = imageH * (r.bottom - r.top).toFloat()
+    val touchW = maxOf(zoneW, MIN_TOUCH).coerceAtMost(imageW)
+    val touchH = maxOf(zoneH, MIN_TOUCH).coerceAtMost(imageH)
+    val touchX = (left + zoneW / 2 - touchW / 2).coerceIn(0.dp, (imageW - touchW).coerceAtLeast(0.dp))
+    val touchY = (top + zoneH / 2 - touchH / 2).coerceIn(0.dp, (imageH - touchH).coerceAtLeast(0.dp))
+    // Outline in the status colour, very light fill so the photo text stays readable.
     Box(
-        modifier.clickable(role = Role.Button, onClick = onClick).semantics(mergeDescendants = true) { contentDescription = description },
+        Modifier
+            .offset(left, top)
+            .size(zoneW, zoneH)
+            .background(tint.copy(alpha = 0.14f), shape)
+            .then(if (slot.status == SlotStatus.KEPT) Modifier.border(2.dp, fg, shape) else Modifier.dashedBorder(fg, 2.dp)),
+    )
+    Box(
+        Modifier
+            .offset(touchX, touchY)
+            .size(touchW, touchH)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = description },
+    )
+    val badge = 18.dp
+    Box(
+        Modifier
+            .offset((left + zoneW - badge).coerceIn(0.dp, (imageW - badge).coerceAtLeast(0.dp)), top.coerceIn(0.dp, (imageH - badge).coerceAtLeast(0.dp)))
+            .size(badge)
+            .graphicsLayer {
+                val k = 1f / zoom
+                scaleX = k
+                scaleY = k
+                transformOrigin = TransformOrigin(1f, 0f)
+            }
+            .background(c.surface, CircleShape)
+            .border(1.dp, fg, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        Box(
-            Modifier
-                .size(zoneWidth, zoneHeight)
-                // Light tint so the paper stays readable under the zone.
-                .background(tint.copy(alpha = 0.35f), shape)
-                .then(if (slot.status == SlotStatus.KEPT) Modifier.border(2.dp, fg, shape) else Modifier.dashedBorder(fg, 2.dp)),
-        )
-        // Status badge: icon on a theme surface so that it reads on any paper colour.
-        Box(
-            Modifier.align(Alignment.TopEnd).size(18.dp).background(c.surface, CircleShape).border(1.dp, fg, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(12.dp))
-        }
+        Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(12.dp))
     }
 }
