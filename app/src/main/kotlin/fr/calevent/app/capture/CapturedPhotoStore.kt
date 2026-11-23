@@ -28,8 +28,10 @@ data class CropRect(val left: Float, val top: Float, val right: Float, val botto
  * @param uri `file:` Uri of a JPEG inside `cacheDir/captures/` (never the gallery).
  * @param quarterTurns user rotation, clockwise quarter turns, always in 0..3.
  * @param crop optional crop in displayed (rotated) coordinates; null means no crop.
+ * @param id changes every time a photo is set (capture or import), even for an identical uri, so work started for
+ *   a previous photo can be recognised as stale.
  */
-data class CapturedPhoto(val uri: Uri, val quarterTurns: Int = 0, val crop: CropRect? = null)
+data class CapturedPhoto(val uri: Uri, val quarterTurns: Int = 0, val crop: CropRect? = null, val id: Long = 0)
 
 /** App-wide holder of the current photo. Files live in the app cache only and are deleted by [clear]. */
 object CapturedPhotoStore {
@@ -42,33 +44,47 @@ object CapturedPhotoStore {
         return File(dir, "capture_${UUID.randomUUID()}.jpg")
     }
 
-    /** Makes [uri] the current photo (rotation and crop reset); the previous file is deleted. */
+    private var nextId = 0L
+
+    /**
+     * Makes [uri] the current photo (rotation and crop reset, new [CapturedPhoto.id]); the previous file is deleted.
+     * A new photo or import always gets a fresh automatic crop suggestion.
+     */
     fun set(uri: Uri) {
         deleteFile(_photo.value)
-        _photo.value = CapturedPhoto(uri)
+        autoCropDone = null
+        _photo.value = CapturedPhoto(uri, id = ++nextId)
     }
 
     fun rotateRight() = rotate(1)
     fun rotateLeft() = rotate(3)
 
-    /** Rotating resets the crop, since it is expressed in displayed coordinates. */
-    private fun rotate(delta: Int) = _photo.update { p -> p?.copy(quarterTurns = (p.quarterTurns + delta) % 4, crop = null) }
+    /** Rotating resets the crop, since it is expressed in displayed coordinates, and so allows a new suggestion. */
+    private fun rotate(delta: Int) {
+        autoCropDone = null
+        _photo.update { p -> p?.copy(quarterTurns = (p.quarterTurns + delta) % 4, crop = null) }
+    }
 
     /** Sets the crop (normalised 0..1, displayed orientation); null removes it. */
     fun setCrop(crop: CropRect?) = _photo.update { p -> p?.copy(crop = crop) }
 
-    // Last (photo, rotation) for which the automatic crop search finished, so coming back to the preview
-    // does not search again nor overwrite what the user chose.
-    private var autoCropDone: Pair<Uri, Int>? = null
+    // (photo id, rotation) for which the automatic crop search finished, so coming back to the preview
+    // does not search again nor overwrite what the user chose. Reset whenever the photo changes.
+    private var autoCropDone: Pair<Long, Int>? = null
 
-    /** True once the automatic crop search has finished for this photo at this rotation. */
-    fun isAutoCropDone(uri: Uri, quarterTurns: Int) = autoCropDone == uri to quarterTurns
+    /** True once the automatic crop search has finished for [photo] at its current rotation. */
+    fun isAutoCropDone(photo: CapturedPhoto) = autoCropDone == photo.id to photo.quarterTurns
 
-    fun markAutoCropDone(uri: Uri, quarterTurns: Int) { autoCropDone = uri to quarterTurns }
+    /** Records that the search finished for [photo]; ignored when [photo] is no longer the current one. */
+    fun markAutoCropDone(photo: CapturedPhoto) {
+        val now = _photo.value ?: return
+        if (now.id == photo.id) autoCropDone = photo.id to photo.quarterTurns
+    }
 
     /** Forgets the current photo and deletes its cache file. */
     fun clear() {
         deleteFile(_photo.value)
+        autoCropDone = null
         _photo.value = null
     }
 
@@ -96,6 +112,10 @@ object CapturedPhotoStore {
         val photo = _photo.value ?: error("No current photo")
         decode(photo, maxSide, applyCrop)
     }
+
+    /** Same as [loadBitmap] for a given [photo] snapshot, so a long job keeps working on the photo it started with. */
+    suspend fun loadBitmapOf(photo: CapturedPhoto, maxSide: Int = 2048, applyCrop: Boolean = true): Bitmap =
+        withContext(Dispatchers.IO) { decode(photo, maxSide, applyCrop) }
 
     private fun decode(photo: CapturedPhoto, maxSide: Int, applyCrop: Boolean): Bitmap {
         val file = File(requireNotNull(photo.uri.path) { "Bad photo uri" })
