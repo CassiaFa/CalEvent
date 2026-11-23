@@ -7,7 +7,9 @@ Usage: tesseract_to_json.py IMAGE PSM OUT.json
 import csv, io, json, subprocess, sys
 
 image, psm, out = sys.argv[1], sys.argv[2], sys.argv[3]
-tsv = subprocess.run(["tesseract", image, "stdout", "-l", "fra", "--psm", psm, "tsv"],
+import os, shlex
+extra = shlex.split(os.environ.get("TESS_ARGS", ""))
+tsv = subprocess.run(["tesseract", image, "stdout", "-l", "fra", "--psm", psm, *extra, "tsv"],
                      check=True, capture_output=True, text=True).stdout
 rows = list(csv.DictReader(io.StringIO(tsv), delimiter="\t", quoting=csv.QUOTE_NONE))
 page = next(r for r in rows if r["level"] == "1")
