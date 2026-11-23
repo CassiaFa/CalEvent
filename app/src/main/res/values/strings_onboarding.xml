@@ -4,6 +4,7 @@
     <string name="onb_continue">Continuer</string>
     <string name="onb_start">Commencer</string>
     <string name="onb_page_cd">Écran %1$d sur %2$d</string>
+    <string name="onb_dots_cd">Page %1$d sur %2$d</string>
     <string name="onb_1_title">Du planning papier à votre agenda</string>
     <string name="onb_1_body">Photographiez un planning : CalEvent repère les créneaux, vous les vérifiez, puis ils rejoignent l\'agenda de votre téléphone.</string>
     <string name="onb_2_title">Rien ne quitte votre téléphone</string>
