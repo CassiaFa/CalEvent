@@ -12,7 +12,16 @@ import android.view.View
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import android.os.Handler
+import android.os.Looper
+import android.view.Surface
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.FocusMeteringAction
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview as CameraPreview
@@ -124,7 +133,21 @@ fun CameraScreen(viewModel: ScanViewModel, onBack: () -> Unit, onNext: () -> Uni
     var asked by rememberSaveable { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    val imageCapture = remember { ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY).build() }
+    // Highest available 4:3 still (what the phone's own camera app saves) and near-lossless JPEG: OCR
+    // needs every pixel of small table text.
+    val imageCapture = remember {
+        ImageCapture.Builder()
+            .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+            .setResolutionSelector(
+                ResolutionSelector.Builder()
+                    .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+                    .setResolutionStrategy(ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY)
+                    .build(),
+            )
+            .setJpegQuality(97)
+            .build()
+    }
+    val focus = remember { FocusHandle() }
     val errorImport = stringResource(R.string.camera_error_import)
     val errorCapture = stringResource(R.string.camera_error_capture)
 
@@ -167,6 +190,8 @@ fun CameraScreen(viewModel: ScanViewModel, onBack: () -> Unit, onNext: () -> Uni
         if (busy) return@shoot
         busy = true
         val file = CapturedPhotoStore.newCaptureFile(context)
+        // Focus and meter at the centre first, then shoot once locked (or after a short timeout).
+        focus.focusThen(context) {
         imageCapture.takePicture(
             ImageCapture.OutputFileOptions.Builder(file).build(),
             ContextCompat.getMainExecutor(context),
@@ -183,6 +208,7 @@ fun CameraScreen(viewModel: ScanViewModel, onBack: () -> Unit, onNext: () -> Uni
                 }
             },
         )
+        }
     }
 
     Box(Modifier.fillMaxSize().background(ViewfinderBg)) {
@@ -207,10 +233,11 @@ fun CameraScreen(viewModel: ScanViewModel, onBack: () -> Unit, onNext: () -> Uni
                 Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(start = 44.dp, end = 44.dp, top = 118.dp).fillMaxWidth().height(420.dp),
             )
         } else {
-            LiveViewfinder(imageCapture, Modifier.fillMaxSize())
+            // 4:3 portrait like the sensor: preview, guide frame and saved photo show the same area.
+            LiveViewfinder(imageCapture, focus, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 80.dp).fillMaxWidth().aspectRatio(3f / 4f))
         }
         // Guide frame (white corners, 4 dp), drawn around the sheet.
-        GuideFrame(Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(start = 28.dp, end = 28.dp, top = 92.dp).fillMaxWidth().height(470.dp))
+        GuideFrame(Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 80.dp).fillMaxWidth().aspectRatio(3f / 4f).padding(20.dp))
 
         TopControls(
             flash = flash,
@@ -257,13 +284,36 @@ fun CameraScreen(viewModel: ScanViewModel, onBack: () -> Unit, onNext: () -> Uni
 private fun hasCameraPermission(context: Context) =
     ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
 
+/** Holds the bound camera so the shutter can focus first. */
+private class FocusHandle {
+    var camera: Camera? = null
+    var view: PreviewView? = null
+
+    fun focusThen(context: Context, action: () -> Unit) {
+        val cam = camera
+        val v = view
+        if (cam == null || v == null || v.width == 0) { action(); return }
+        var done = false
+        val once = { if (!done) { done = true; action() } }
+        val handler = Handler(Looper.getMainLooper())
+        runCatching {
+            val point = v.meteringPointFactory.createPoint(v.width / 2f, v.height / 2f)
+            val future = cam.cameraControl.startFocusAndMetering(
+                FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE).build(),
+            )
+            future.addListener({ handler.removeCallbacksAndMessages(null); once() }, ContextCompat.getMainExecutor(context))
+            handler.postDelayed({ once() }, 1500)
+        }.onFailure { once() }
+    }
+}
+
 /** CameraX preview bound to the lifecycle; [imageCapture] is bound with it. */
 @Composable
-private fun LiveViewfinder(imageCapture: ImageCapture, modifier: Modifier) {
+private fun LiveViewfinder(imageCapture: ImageCapture, focus: FocusHandle, modifier: Modifier) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val previewView = remember {
-        PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER; implementationMode = PreviewView.ImplementationMode.COMPATIBLE }
+        PreviewView(context).apply { scaleType = PreviewView.ScaleType.FIT_CENTER; implementationMode = PreviewView.ImplementationMode.COMPATIBLE }
     }
     DisposableEffect(lifecycleOwner) {
         val future = ProcessCameraProvider.getInstance(context)
@@ -271,15 +321,21 @@ private fun LiveViewfinder(imageCapture: ImageCapture, modifier: Modifier) {
         future.addListener({
             val p = future.get()
             provider = p
-            val preview = CameraPreview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
+            val preview = CameraPreview.Builder()
+                .setResolutionSelector(ResolutionSelector.Builder().setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY).build())
+                .build().also { it.surfaceProvider = previewView.surfaceProvider }
             // The view port makes the captured JPEG cover exactly what the (FILL_CENTER) preview shows.
             // It is only known once the view is laid out.
             fun bind() {
                 runCatching {
                     val group = UseCaseGroup.Builder().addUseCase(preview).addUseCase(imageCapture)
                     previewView.viewPort?.let { group.setViewPort(it) }
+                    val rotation = previewView.display?.rotation ?: Surface.ROTATION_0
+                    preview.targetRotation = rotation
+                    imageCapture.targetRotation = rotation
                     p.unbindAll()
-                    p.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, group.build())
+                    focus.view = previewView
+                    focus.camera = p.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, group.build())
                 }
             }
             if (previewView.viewPort != null) bind()
@@ -292,7 +348,7 @@ private fun LiveViewfinder(imageCapture: ImageCapture, modifier: Modifier) {
                 }
             })
         }, ContextCompat.getMainExecutor(context))
-        onDispose { provider?.unbindAll() }
+        onDispose { focus.camera = null; provider?.unbindAll() }
     }
     AndroidView(factory = { previewView }, modifier = modifier)
 }
