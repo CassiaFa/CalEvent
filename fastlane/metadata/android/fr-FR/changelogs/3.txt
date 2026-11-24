@@ -1,0 +1,3 @@
+- Recadrage automatique : le cadre proposé couvre tout le tableau (cases colorées, titre), sans se laisser tromper par le parquet ou une case isolée.
+- Aperçu : la photo est remise à l'endroit automatiquement (tournée ou à l'envers) ; les boutons Pivoter restent disponibles.
+- Vue Photo : chaque zone surligne la case entière, le symbole ne cache plus le texte.
