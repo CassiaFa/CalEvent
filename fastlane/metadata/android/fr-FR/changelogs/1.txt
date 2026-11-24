@@ -1,0 +1,6 @@
+Première version publique (préversion de test).
+- Photo ou import d'un planning papier, recadrage automatique, lecture du texte sur l'appareil.
+- Relecture des créneaux : Retenu / À revoir / Ignoré, balayage, fiche sans clavier.
+- Plannings d'équipe : choix de la personne, codes définis par l'utilisateur.
+- Envoi dans l'agenda du téléphone (dont CalDAV via DAVx⁵), doublons ignorés.
+- Aucune permission Internet.
