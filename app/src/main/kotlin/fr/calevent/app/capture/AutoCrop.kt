@@ -3,6 +3,7 @@ package fr.calevent.app.capture
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import androidx.core.graphics.scale
 import fr.calevent.app.ocr.OcrEngine
 import fr.calevent.app.ocr.createOcrEngine
 import fr.calevent.core.ShiftCodeTable
@@ -126,9 +127,9 @@ object AutoCrop {
 
     /** Quick reading of a reduced copy of [bitmap] (positions are pixels of that copy); null when the engine fails. */
     private suspend fun recognize(engine: OcrEngine, bitmap: Bitmap): RecognizedText? = try {
-        val scale = minOf(1.0, OCR_SIDE.toDouble() / max(bitmap.width, bitmap.height))
-        val small = if (scale < 1.0) {
-            Bitmap.createScaledBitmap(bitmap, max(1, (bitmap.width * scale).roundToInt()), max(1, (bitmap.height * scale).roundToInt()), true)
+        val factor = minOf(1.0, OCR_SIDE.toDouble() / max(bitmap.width, bitmap.height))
+        val small = if (factor < 1.0) {
+            bitmap.scale(max(1, (bitmap.width * factor).roundToInt()), max(1, (bitmap.height * factor).roundToInt()))
         } else bitmap
         try {
             engine.recognizeQuick(small)

@@ -72,8 +72,10 @@ import fr.calevent.app.ui.components.StatusChip
 import fr.calevent.app.ui.components.slotTimeText
 import fr.calevent.app.ui.icons.CalEventIcons
 import fr.calevent.app.ui.theme.CalEventTheme
+import fr.calevent.core.Region
 import fr.calevent.core.Slot
 import fr.calevent.core.SlotStatus
+import fr.calevent.core.image.PhotoZones
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -104,9 +106,15 @@ private fun zoneEndInset(index: Int): Dp = (index % 4 * 8).dp
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun PhotoView(slots: List<Slot>, onOpen: (String) -> Unit, modifier: Modifier = Modifier, photo: Bitmap? = null) {
+internal fun PhotoView(
+    slots: List<Slot>,
+    onOpen: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    photo: Bitmap? = null,
+    cells: List<Region> = emptyList(),
+) {
     if (photo != null) {
-        RealPhotoView(photo, slots, onOpen, modifier)
+        RealPhotoView(photo, slots, cells, onOpen, modifier)
         return
     }
     val ordered = remember(slots) { slots.sortedWith(compareBy<Slot> { it.date }.thenBy { it.start }.thenBy { it.id }) }
@@ -225,12 +233,13 @@ private const val DOUBLE_TAP_SCALE = 2.5f
 private val MIN_TOUCH = 44.dp
 
 /**
- * The real photo with each slot's [Slot.region] laid over it. A zone is its status as outline style
- * (solid / dashed), a light tint and a badge icon; its touch area is at least 44 dp.
+ * The real photo with each slot's [Slot.region] laid over it. A zone is the table cell holding the slot's text
+ * ([cells], when the grid is known) or the text padded generously ([PhotoZones]); it shows its status as outline style
+ * (solid / dashed), a light tint and a badge icon on its corner; its touch area is at least 44 dp.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun RealPhotoView(photo: Bitmap, slots: List<Slot>, onOpen: (String) -> Unit, modifier: Modifier) {
+private fun RealPhotoView(photo: Bitmap, slots: List<Slot>, cells: List<Region>, onOpen: (String) -> Unit, modifier: Modifier) {
     val image = remember(photo) { photo.asImageBitmap() }
     val withZone = slots.filter { it.region != null }
     val photoCd = stringResource(R.string.results_photo_cd)
@@ -302,8 +311,10 @@ private fun RealPhotoView(photo: Bitmap, slots: List<Slot>, onOpen: (String) -> 
                     modifier = Modifier.fillMaxSize(),
                 )
                 withZone.forEach { slot ->
+                    val zone = remember(slot.region, cells, photo) { PhotoZones.zone(slot.region!!, cells, photo.width, photo.height) }
                     PhotoZone(
                         slot = slot,
+                        r = zone,
                         imageW = w,
                         imageH = h,
                         zoom = scale,
@@ -326,13 +337,13 @@ private fun RealPhotoView(photo: Bitmap, slots: List<Slot>, onOpen: (String) -> 
 }
 
 /**
- * One zone, laid out in the same image-sized coordinate space as the photo (inside the zoom layer):
- * outline + faint fill at the exact region, an invisible >= 44 dp touch box centred on it, and the
- * status badge anchored to the zone's top-right corner and counter-scaled by [zoom] to stay constant on screen.
+ * One zone [r], laid out in the same image-sized coordinate space as the photo (inside the zoom layer):
+ * outline + faint fill, an invisible >= 44 dp touch box centred on it, and the status badge centred on the zone's
+ * top-right corner (half outside, so it covers the corner of the cell, not the text in it), counter-scaled by
+ * [zoom] to stay constant on screen.
  */
 @Composable
-private fun PhotoZone(slot: Slot, imageW: Dp, imageH: Dp, zoom: Float, onClick: () -> Unit) {
-    val r = slot.region ?: return
+private fun PhotoZone(slot: Slot, r: Region, imageW: Dp, imageH: Dp, zoom: Float, onClick: () -> Unit) {
     val c = CalEventTheme.colors
     val (fg, tint, icon) = when (slot.status) {
         SlotStatus.KEPT -> Triple(c.kept, c.keptBg, CalEventIcons.Check)
@@ -374,13 +385,16 @@ private fun PhotoZone(slot: Slot, imageW: Dp, imageH: Dp, zoom: Float, onClick: 
     val badge = 18.dp
     Box(
         Modifier
-            .offset((left + zoneW - badge).coerceIn(0.dp, (imageW - badge).coerceAtLeast(0.dp)), top.coerceIn(0.dp, (imageH - badge).coerceAtLeast(0.dp)))
+            .offset(
+                (left + zoneW - badge / 2).coerceIn(0.dp, (imageW - badge).coerceAtLeast(0.dp)),
+                (top - badge / 2).coerceIn(0.dp, (imageH - badge).coerceAtLeast(0.dp)),
+            )
             .size(badge)
             .graphicsLayer {
                 val k = 1f / zoom
                 scaleX = k
                 scaleY = k
-                transformOrigin = TransformOrigin(1f, 0f)
+                transformOrigin = TransformOrigin(0.5f, 0.5f)
             }
             .background(c.surface, CircleShape)
             .border(1.dp, fg, CircleShape),

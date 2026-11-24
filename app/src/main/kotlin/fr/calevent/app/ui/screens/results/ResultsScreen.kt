@@ -57,6 +57,7 @@ import fr.calevent.app.ui.components.StatusChip
 import fr.calevent.app.ui.icons.CalEventIcons
 import fr.calevent.app.ui.theme.CalEventTheme
 import fr.calevent.app.ui.theme.ThemeMode
+import fr.calevent.core.Region
 import fr.calevent.core.Slot
 import fr.calevent.core.parse.ParseWarning
 import fr.calevent.core.SlotStatus
@@ -79,6 +80,7 @@ fun ResultsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val photo by viewModel.photoBitmap.collectAsState()
+    val photoCells by viewModel.photoCells.collectAsState()
     val turn by viewModel.photoTurn.collectAsState()
     ResultsContent(
         state = state,
@@ -96,6 +98,7 @@ fun ResultsScreen(
         onDefineCode = onDefineCode,
         onSetMe = onSetMe,
         photo = photo,
+        photoCells = photoCells,
         turn = turn,
     )
 }
@@ -115,6 +118,7 @@ internal fun ResultsContent(
     onDefineCode: (String) -> Unit = {},
     onSetMe: (String?) -> Unit = {},
     photo: Bitmap? = null,
+    photoCells: List<Region> = emptyList(),
     turn: PhotoTurn = PhotoTurn.None,
     initialTab: Int = 0,
 ) {
@@ -236,7 +240,7 @@ internal fun ResultsContent(
                     onIgnore = { swipe(it, UserDecision.IGNORE) },
                 )
             } else {
-                PhotoView(slots = state.visibleSlots, onOpen = { openId = it }, photo = photo)
+                PhotoView(slots = state.visibleSlots, onOpen = { openId = it }, photo = photo, cells = photoCells)
             }
             SnackbarHost(snackbarHost, Modifier.align(Alignment.BottomCenter).padding(horizontal = 12.dp, vertical = 8.dp)) { data ->
                 Snackbar(

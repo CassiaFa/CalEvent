@@ -10,6 +10,7 @@ import android.graphics.Bitmap
 import fr.calevent.app.analysis.AnalysisStep
 import fr.calevent.app.analysis.ScanAnalyzer
 import fr.calevent.app.capture.CapturedPhotoStore
+import fr.calevent.core.Region
 import fr.calevent.core.ShiftCodeTable
 import fr.calevent.core.resolveUnknownCodes
 import fr.calevent.core.parse.ParseResult
@@ -144,6 +145,11 @@ class ScanViewModel : ViewModel() {
 
     /** Image the current slots were read on (their regions are fractions of it); null with fake data. */
     val photoBitmap: StateFlow<Bitmap?> = _photoBitmap.asStateFlow()
+
+    private val _photoCells = MutableStateFlow<List<Region>>(emptyList())
+
+    /** Cells of the ruled table of [photoBitmap] (fractions of it), to highlight whole cells; empty without a grid. */
+    val photoCells: StateFlow<List<Region>> = _photoCells.asStateFlow()
 
     private val _photoTurn = MutableStateFlow(PhotoTurn.None)
 
@@ -357,6 +363,7 @@ class ScanViewModel : ViewModel() {
                 }
                 val result = out.result
                 _photoBitmap.value = out.bitmap
+                _photoCells.value = out.cells
                 _photoTurn.value = PhotoTurn(result.rotationDegrees, result.skewDegrees)
                 val failed = ParseWarning.NO_SLOTS in result.warnings
                 val team = result.kind.isTeam

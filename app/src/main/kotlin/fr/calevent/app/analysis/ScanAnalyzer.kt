@@ -3,26 +3,35 @@ package fr.calevent.app.analysis
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import androidx.core.graphics.scale
 import fr.calevent.app.capture.CapturedPhotoStore
 import fr.calevent.app.ocr.OcrDebugDump
 import fr.calevent.app.ocr.createOcrEngine
+import fr.calevent.core.Region
 import fr.calevent.core.ShiftCodeTable
+import fr.calevent.core.image.GridDetector
+import fr.calevent.core.image.OcrPreprocess
+import fr.calevent.core.image.PhotoZones
 import fr.calevent.core.parse.ParseResult
 import fr.calevent.core.parse.ParseWarning
 import fr.calevent.core.parse.RecognizedText
 import fr.calevent.core.parse.ScheduleParser
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
+import kotlin.math.max
+import kotlin.math.roundToInt
 
 /**
  * What the pipeline produced. [bitmap] is the image the text was read on: slot regions are fractions
- * of it, so it is the one to display (it may be the photo turned by a multiple of 90 degrees).
+ * of it, so it is the one to display (it may be the photo turned by a multiple of 90 degrees). [cells] are the cells
+ * of the ruled table found on it (fractions of it too), used to highlight whole cells; empty without a grid.
  */
-class AnalysisOutput(val result: ParseResult, val bitmap: Bitmap, val lineCount: Int)
+class AnalysisOutput(val result: ParseResult, val bitmap: Bitmap, val lineCount: Int, val cells: List<Region> = emptyList())
 
 /** Pipeline steps reported to the UI. */
 object AnalysisStep {
@@ -75,8 +84,9 @@ class ScanAnalyzer {
             val structStart = System.currentTimeMillis()
             val result = best.result!!
             OcrDebugDump.write(context, best.text)
+            val cells = tableCells(best.bitmap)
             padTo(structStart)
-            AnalysisOutput(result, best.bitmap, best.text.lines.size)
+            AnalysisOutput(result, best.bitmap, best.text.lines.size, cells)
         }
     }
 
@@ -92,6 +102,29 @@ class ScanAnalyzer {
         return r.rotationDegrees != 0 ||
             ParseWarning.ROTATED_QUARTER_TURN in r.warnings || ParseWarning.UPSIDE_DOWN in r.warnings ||
             ParseWarning.NO_SLOTS in r.warnings || a.text.lines.size < MIN_LINES
+    }
+
+    /** Cells of the ruled table of [bitmap] ([GridDetector] on a reduced gray copy), as fractions; empty on failure. */
+    private fun tableCells(bitmap: Bitmap): List<Region> = try {
+        val factor = minOf(1.0, GRID_SIDE.toDouble() / max(bitmap.width, bitmap.height))
+        val w = max(1, (bitmap.width * factor).roundToInt())
+        val h = max(1, (bitmap.height * factor).roundToInt())
+        val small = if (factor < 1.0) bitmap.scale(w, h) else bitmap
+        val argb = IntArray(w * h)
+        try {
+            small.getPixels(argb, 0, w, 0, 0, w, h)
+        } finally {
+            if (small !== bitmap) small.recycle()
+        }
+        val gray = IntArray(argb.size) { i ->
+            val p = argb[i]
+            (((p shr 16) and 0xFF) * 299 + ((p shr 8) and 0xFF) * 587 + (p and 0xFF) * 114) / 1000
+        }
+        OcrPreprocess.prepare(gray, w, h).grid?.let { PhotoZones.cellsOf(it, w, h) }.orEmpty()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        emptyList()
     }
 
     private fun rotated(src: Bitmap, degrees: Int): Bitmap =
@@ -113,5 +146,8 @@ class ScanAnalyzer {
     private companion object {
         const val MIN_STEP_MILLIS = 600L
         const val MIN_LINES = 6
+
+        /** Long side of the copy the table grid is searched on for the highlighted cells. */
+        const val GRID_SIDE = 1600
     }
 }
