@@ -4,6 +4,9 @@ import fr.calevent.core.image.IntBox
 import fr.calevent.core.image.Point
 import fr.calevent.core.image.TableCell
 import fr.calevent.core.image.TableGrid
+import fr.calevent.core.parse.Box
+import fr.calevent.core.parse.RecognizedText
+import fr.calevent.core.parse.TextLine
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -90,22 +93,37 @@ class CropSuggestionTest {
     }
 
     @Test
-    fun `suggest falls back to the text bounds without a grid`() {
-        val text = NormalizedRect(0.2f, 0.2f, 0.8f, 0.8f)
-        assertEquals(text, CropSuggestion.suggest(null, 1000, 1000, text))
-        assertNull(CropSuggestion.suggest(null, 1000, 1000, null))
+    fun `suggest falls back to the text bounds without a table`() {
+        val text = text(List(4) { Box(200.0, 200.0 + 100 * it, 800.0, 230.0 + 100 * it) })
+        val r = assertNotNull(CropSuggestion.suggest(null, text))
+        near(0.17f, r.left); near(0.17f, r.top)
+        assertNull(CropSuggestion.suggest(null, null))
     }
 
     @Test
-    fun `suggest falls back to the text bounds when the grid is rejected`() {
-        val text = NormalizedRect(0.2f, 0.2f, 0.8f, 0.8f)
-        assertEquals(text, CropSuggestion.suggest(grid(400.0, 400.0, 500.0, 500.0), 1000, 1000, text))
+    fun `suggest prefers the table over the text`() {
+        val text = text(List(4) { Box(0.0, 100.0 * it, 500.0, 30.0 + 100 * it) })
+        val r = assertNotNull(CropSuggestion.suggest(NormalizedRect(0.1f, 0.3f, 0.9f, 0.8f), text))
+        near(0.08f, r.left); near(0.92f, r.right)
     }
 
     @Test
-    fun `suggest prefers the grid over the text`() {
-        val text = NormalizedRect(0.0f, 0.0f, 0.5f, 0.5f)
-        val r = assertNotNull(CropSuggestion.suggest(grid(100.0, 300.0, 900.0, 800.0), 1000, 1000, text))
-        near(0.08f, r.left)
+    fun `a title line just above the table raises the top, text above it does not`() {
+        val lines = listOf(
+            Box(300.0, 20.0, 700.0, 50.0), // header far above: not part of the title
+            Box(300.0, 230.0, 700.0, 270.0), // title
+            Box(150.0, 320.0, 400.0, 340.0), Box(500.0, 420.0, 800.0, 440.0),
+        )
+        val r = assertNotNull(CropSuggestion.suggest(NormalizedRect(0.1f, 0.3f, 0.9f, 0.8f), text(lines)))
+        near(0.22f, r.top)
     }
+
+    @Test
+    fun `text beside the table is not a title`() {
+        val lines = listOf(Box(0.0, 230.0, 80.0, 270.0), Box(150.0, 320.0, 400.0, 340.0), Box(500.0, 420.0, 800.0, 440.0))
+        val r = assertNotNull(CropSuggestion.suggest(NormalizedRect(0.1f, 0.3f, 0.9f, 0.8f), text(lines)))
+        near(0.26f, r.top)
+    }
+
+    private fun text(boxes: List<Box>) = RecognizedText(1000, 1000, boxes.map { b -> TextLine("Lun 12", b) })
 }

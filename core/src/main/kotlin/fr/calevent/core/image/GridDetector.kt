@@ -74,13 +74,13 @@ object GridDetector {
     private const val MAX_THICKNESS_RATIO = 0.012
 
     /** Max |slope| of a line (about 5 degrees). */
-    private const val MAX_SLOPE = 0.09
+    internal const val MAX_SLOPE = 0.09
 
     /** Max slope difference for two segments of the same line (about 1.5 degrees). */
     private const val MERGE_SLOPE = 0.027
 
     /** Max offset between two segments of the same line, fraction of the long side (6 px on 2000 px). */
-    private const val MERGE_OFFSET_RATIO = 0.003
+    internal const val MERGE_OFFSET_RATIO = 0.003
 
     /** Tolerance when testing whether two lines cross, fraction of the long side (20 px on 2000 px). */
     private const val CROSS_TOLERANCE_RATIO = 0.01
@@ -277,7 +277,7 @@ object GridDetector {
     private fun halfWidth(l: Line): Double = max(1.0, (l.thickness - 2) / 2) + INSET
 
     /** Intersection of a horizontal and a vertical line. */
-    private fun intersect(h: Line, v: Line): Point {
+    internal fun intersect(h: Line, v: Line): Point {
         // y = ah + bh x ; x = av + bv y
         val x = (v.a + v.b * h.a) / (1 - v.b * h.b)
         return Point(x, h.at(x))
@@ -287,7 +287,7 @@ object GridDetector {
      * True when [h] and [v] meet: the intersection is on [v] (within [tol] of its ends: a rule may stop just
      * short of the table border) and on a drawn part of [h] (within [touch]).
      */
-    private fun crosses(h: Line, v: Line, tol: Double, touch: Double): Boolean {
+    internal fun crosses(h: Line, v: Line, tol: Double, touch: Double): Boolean {
         val p = intersect(h, v)
         if (p.y < v.minU - tol || p.y > v.maxU + tol) return false
         if (p.x < h.minU - tol || p.x > h.maxU + tol) return false
@@ -310,7 +310,7 @@ object GridDetector {
     }
 
     /** Merges collinear segments into lines, longest first. */
-    private fun mergeSegments(segments: List<Line>, maxOffset: Double): List<Line> {
+    internal fun mergeSegments(segments: List<Line>, maxOffset: Double): List<Line> {
         val lines = ArrayList<Line>()
         for (s in segments.sortedByDescending { it.length }) {
             val mid = (s.minU + s.maxU) / 2.0
@@ -326,10 +326,13 @@ object GridDetector {
      * Segments of long dark runs. [horizontal]: runs along rows; otherwise along columns (the image is read
      * transposed). A pixel counts as dark when it or one of its two neighbours across the line is dark.
      */
-    private fun segments(img: IntArray, steps: BooleanArray, w: Int, h: Int, horizontal: Boolean, minRun: Int, maxThickness: Double): List<Line> {
+    private fun segments(img: IntArray, steps: BooleanArray, w: Int, h: Int, horizontal: Boolean, minRun: Int, maxThickness: Double): List<Line> =
+        segmentsOf(lineMask(img, steps, w, h, horizontal, maxThickness.toInt()), w, h, horizontal, minRun, maxThickness)
+
+    /** Same as [segments] on a ready-made [mask] of line pixels (`w * h`, row-major). */
+    internal fun segmentsOf(mask: BooleanArray, w: Int, h: Int, horizontal: Boolean, minRun: Int, maxThickness: Double): List<Line> {
         val lenU = if (horizontal) w else h // along the line
         val lenV = if (horizontal) h else w // across
-        val mask = lineMask(img, steps, w, h, horizontal, maxThickness.toInt())
         fun dark(u: Int, v: Int): Boolean {
             if (v < 0 || v >= lenV) return false
             return mask[if (horizontal) v * w + u else u * w + v]

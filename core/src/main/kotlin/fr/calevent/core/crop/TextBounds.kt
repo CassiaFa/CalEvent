@@ -27,6 +27,12 @@ object TextBounds {
     /** Lines further apart than this many median line heights belong to different clusters. */
     const val CLUSTER_GAP_HEIGHTS = 6.0
 
+    /**
+     * ... and never closer than this fraction of the short image side: the small text of a table's cells sits a
+     * whole column apart, which must not split the table into columns.
+     */
+    const val MIN_CLUSTER_GAP = 0.06
+
     /** Short lines (at most [SHORT_LINE_CHARS] characters) below this confidence are noise. */
     const val MIN_SHORT_CONFIDENCE = 0.4
     const val SHORT_LINE_CHARS = 3
@@ -37,7 +43,7 @@ object TextBounds {
         val usable = text.lines.filter { it.box.width > 0 && it.box.height > 0 && !it.isNoise() }
         if (usable.size < MIN_LINES) return null
 
-        val main = mainCluster(usable)
+        val main = mainCluster(usable, MIN_CLUSTER_GAP * min(text.width, text.height))
         if (main.size < MIN_LINES) return null
 
         val union = main.map { it.box }.reduce(Box::union)
@@ -56,10 +62,13 @@ object TextBounds {
     private fun TextLine.isNoise(): Boolean =
         text.trim().length <= SHORT_LINE_CHARS && (confidence ?: 1.0) < MIN_SHORT_CONFIDENCE
 
-    /** Single-linkage clusters of boxes (gap relative to median height); keeps the one with the largest text area. */
-    private fun mainCluster(lines: List<TextLine>): List<TextLine> {
+    /**
+     * Single-linkage clusters of boxes (gap relative to median height, at least [minGap]); keeps the one with the
+     * most lines, then the largest text area (a big title alone must not win over the table).
+     */
+    private fun mainCluster(lines: List<TextLine>, minGap: Double): List<TextLine> {
         val heights = lines.map { it.box.height }.sorted()
-        val gap = CLUSTER_GAP_HEIGHTS * heights[heights.size / 2]
+        val gap = max(minGap, CLUSTER_GAP_HEIGHTS * heights[heights.size / 2])
 
         val parent = IntArray(lines.size) { it }
         fun find(i: Int): Int {
@@ -73,7 +82,7 @@ object TextBounds {
             if (distance(lines[i].box, lines[j].box) <= gap) parent[find(i)] = find(j)
         }
         return lines.indices.groupBy { find(it) }.values
-            .maxBy { idx -> idx.sumOf { lines[it].box.width * lines[it].box.height } }
+            .maxWith(compareBy({ it.size }, { idx -> idx.sumOf { lines[it].box.width * lines[it].box.height } }))
             .map { lines[it] }
     }
 
