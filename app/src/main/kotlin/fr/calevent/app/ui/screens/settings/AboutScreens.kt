@@ -2,6 +2,7 @@ package fr.calevent.app.ui.screens.settings
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.foundation.Image
@@ -33,22 +34,26 @@ import fr.calevent.app.ui.theme.CalEventTheme
 import fr.calevent.app.ui.theme.ThemeMode
 
 /** About (9e). [onOpenIntro] replays the first-launch presentation. */
+private const val SOURCE_URL = "https://github.com/CassiaFa/CalEvent"
+
 @Composable
 fun AboutScreen(onBack: () -> Unit, onOpenIntro: () -> Unit, onOpenPolicy: () -> Unit, onOpenLicenses: () -> Unit) {
     val c = CalEventTheme.colors
     val context = LocalContext.current
     val noBrowser = stringResource(R.string.settings_about_no_browser)
-    fun open(kind: FeedbackKind) {
-        val uri = feedbackUrl(
-            kind, BuildConfig.VERSION_NAME, BuildConfig.FLAVOR,
-            "${Build.MANUFACTURER} ${Build.MODEL}", "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
-        )
+    fun openInBrowser(uri: Uri) {
         try {
             context.startActivity(Intent(Intent.ACTION_VIEW, uri))
         } catch (_: ActivityNotFoundException) {
             Toast.makeText(context, noBrowser, Toast.LENGTH_SHORT).show()
         }
     }
+    fun open(kind: FeedbackKind) = openInBrowser(
+        feedbackUrl(
+            kind, BuildConfig.VERSION_NAME, BuildConfig.FLAVOR,
+            "${Build.MANUFACTURER} ${Build.MODEL}", "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
+        ),
+    )
     ScreenScaffold(title = stringResource(R.string.settings_about_title), onBack = onBack) {
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
@@ -58,6 +63,7 @@ fun AboutScreen(onBack: () -> Unit, onOpenIntro: () -> Unit, onOpenPolicy: () ->
                 Image(painterResource(R.drawable.ic_logo), contentDescription = null, modifier = Modifier.size(88.dp))
                 Text(stringResource(R.string.settings_about_app), style = CalEventTheme.type.title, color = c.ink, modifier = Modifier.semantics { heading() })
                 Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME), style = CalEventTheme.type.secondary, color = c.ink2)
+                Text(stringResource(R.string.settings_about_free_software), style = CalEventTheme.type.secondary, color = c.ink2)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(CalEventIcons.ShieldOffline, contentDescription = null, tint = c.kept, modifier = Modifier.size(20.dp))
                     Text(stringResource(R.string.settings_about_offline), style = CalEventTheme.type.secondary.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = c.kept)
@@ -75,6 +81,8 @@ fun AboutScreen(onBack: () -> Unit, onOpenIntro: () -> Unit, onOpenPolicy: () ->
                     SettingsRow(stringResource(R.string.settings_about_report), icon = CalEventIcons.External, onClick = { open(FeedbackKind.BUG) })
                     RowDivider()
                     SettingsRow(stringResource(R.string.settings_about_feedback), icon = CalEventIcons.External, onClick = { open(FeedbackKind.FEEDBACK) })
+                    RowDivider()
+                    SettingsRow(stringResource(R.string.settings_about_source), icon = CalEventIcons.External, onClick = { openInBrowser(Uri.parse(SOURCE_URL)) })
                 }
                 Text(stringResource(R.string.settings_about_feedback_note), style = CalEventTheme.type.secondary, color = c.ink2, modifier = Modifier.padding(horizontal = 16.dp))
             }
@@ -114,12 +122,21 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
 fun LicensesScreen(onBack: () -> Unit) {
     val c = CalEventTheme.colors
     TextPage(stringResource(R.string.settings_licenses_title), onBack) {
-        Text(stringResource(R.string.settings_licenses_intro), style = CalEventTheme.type.body, color = c.ink2)
+        Column {
+            Text(stringResource(R.string.settings_license_app), style = CalEventTheme.type.bodyStrong, color = c.ink)
+            Text(stringResource(R.string.settings_license_gpl), style = CalEventTheme.type.secondary, color = c.ink2)
+        }
+        Text(stringResource(R.string.settings_licenses_intro), style = CalEventTheme.type.body, color = c.ink2, modifier = Modifier.padding(top = 12.dp))
+        val ocr = if (BuildConfig.FLAVOR == "foss") {
+            R.string.settings_license_tesseract to R.string.settings_license_tesseract_terms
+        } else {
+            R.string.settings_license_mlkit to R.string.settings_license_mlkit_terms
+        }
         listOf(
             R.string.settings_license_androidx to R.string.settings_license_apache,
             R.string.settings_license_camerax to R.string.settings_license_apache,
             R.string.settings_license_kotlin to R.string.settings_license_apache,
-            R.string.settings_license_mlkit to R.string.settings_license_mlkit_terms,
+            ocr,
             R.string.settings_license_fonts to R.string.settings_license_ofl,
         ).forEach { (name, licence) ->
             Column(Modifier.padding(top = 12.dp)) {

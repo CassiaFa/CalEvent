@@ -94,6 +94,12 @@
     <string name="settings_license_apache">Apache License 2.0</string>
     <string name="settings_license_mlkit_terms">Conditions d\'utilisation de Google ML Kit</string>
     <string name="settings_license_ofl">SIL Open Font License 1.1</string>
+    <string name="settings_license_app">CalEvent</string>
+    <string name="settings_license_gpl">Logiciel libre sous licence GNU GPL 3.0 ou ultérieure. Le code source est public : vous pouvez l\'étudier, le modifier et le redistribuer selon cette licence.</string>
+    <string name="settings_license_tesseract">Tesseract OCR, Tesseract4Android et Leptonica</string>
+    <string name="settings_license_tesseract_terms">Apache License 2.0 (Leptonica : licence BSD à 2 clauses)</string>
+    <string name="settings_about_free_software">Logiciel libre · GPL-3.0</string>
+    <string name="settings_about_source">Code source</string>
     <string name="settings_me_unset">Non défini</string>
     <string name="settings_me_title">Mon nom dans les plannings</string>
     <string name="settings_me_hint">Votre nom et votre prénom servent à présélectionner votre ligne quand elle est trouvée dans le tableau (« NOM Prénom », « Prénom N. », « NOM »…). Si plusieurs personnes correspondent, rien n\'est présélectionné. Ces informations restent sur ce téléphone.</string>
