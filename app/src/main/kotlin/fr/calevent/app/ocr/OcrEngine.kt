@@ -15,4 +15,10 @@ interface OcrEngine : AutoCloseable {
      * coordinates are pixels of the upright image (full size of [bitmap] once rotated).
      */
     suspend fun recognize(bitmap: Bitmap, rotationDegrees: Int = 0): RecognizedText
+
+    /**
+     * A faster, rougher reading of an upright [bitmap], for quick decisions before the analysis (orientation, crop):
+     * only the positions and the gist of the text matter. Defaults to [recognize].
+     */
+    suspend fun recognizeQuick(bitmap: Bitmap): RecognizedText = recognize(bitmap)
 }

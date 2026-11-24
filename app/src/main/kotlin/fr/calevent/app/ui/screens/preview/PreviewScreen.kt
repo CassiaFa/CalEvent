@@ -117,24 +117,37 @@ fun PreviewScreen(viewModel: ScanViewModel, onBack: () -> Unit, onNext: () -> Un
     val photoId = photo?.id
     val turns = photo?.quarterTurns ?: 0
     var cropping by rememberSaveable(photoId) { mutableStateOf(false) }
-    var autoApplied by rememberSaveable(photoId, turns) { mutableStateOf(false) }
+    // Keyed by the photo only: an automatic orientation changes the rotation and applies the frame at once.
+    var autoApplied by rememberSaveable(photoId) { mutableStateOf(false) }
     // (photo id, rotation) of the running automatic search; a cancelled search of an older photo cannot clear it.
     var searchingFor by remember { mutableStateOf<Pair<Long, Int>?>(null) }
     val searching = searchingFor != null
-    // Automatic pre-crop: table grid (or recognised text) on a reduced bitmap, applied only if the user has not
-    // set a crop meanwhile. Restarts for every new photo or rotation, never for a photo already searched.
+    // Automatic preparation: once per new photo, its orientation (turned upright when the text reads better another
+    // way), then the frame of the table (or of the recognised text) on a reduced bitmap, applied only if the user has
+    // not set a crop meanwhile. The frame is searched again after every manual rotation, the orientation never.
     LaunchedEffect(photoId, turns) {
         val snapshot = CapturedPhotoStore.photo.value ?: return@LaunchedEffect
         if (snapshot.id != photoId || snapshot.quarterTurns != turns || CapturedPhotoStore.isAutoCropDone(snapshot)) return@LaunchedEffect
         val key = snapshot.id to snapshot.quarterTurns
         searchingFor = key
-        val suggestion = try { AutoCrop.suggest(context, snapshot) } finally { if (searchingFor == key) searchingFor = null }
+        val orient = !CapturedPhotoStore.isAutoOrientDone(snapshot)
+        val suggestion = try { AutoCrop.suggest(context, snapshot, orient) } finally { if (searchingFor == key) searchingFor = null }
         val now = CapturedPhotoStore.photo.value
         // The photo was replaced, cleared or rotated meanwhile: this result is stale.
         if (now == null || now.id != snapshot.id || now.quarterTurns != snapshot.quarterTurns) return@LaunchedEffect
+        if (suggestion != null && suggestion.quarterTurns != now.quarterTurns && now.crop == null) {
+            CapturedPhotoStore.applyAutoOrientation(now, suggestion.quarterTurns, suggestion.crop)
+            if (suggestion.crop != null) {
+                cropping = true
+                autoApplied = true
+            }
+            return@LaunchedEffect
+        }
+        CapturedPhotoStore.markAutoOrientDone(now)
         CapturedPhotoStore.markAutoCropDone(now)
-        if (suggestion != null && now.crop == null) {
-            CapturedPhotoStore.setCrop(suggestion)
+        val crop = suggestion?.crop
+        if (crop != null && now.crop == null) {
+            CapturedPhotoStore.setCrop(crop)
             cropping = true
             autoApplied = true
         }

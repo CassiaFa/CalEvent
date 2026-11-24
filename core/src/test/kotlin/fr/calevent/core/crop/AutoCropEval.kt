@@ -1,6 +1,9 @@
 package fr.calevent.core.crop
 
+import fr.calevent.core.ShiftCodeTable
+import fr.calevent.core.image.OcrPreprocess
 import fr.calevent.core.image.TableCells
+import fr.calevent.core.parse.Orientation
 import fr.calevent.core.parse.Box
 import fr.calevent.core.parse.RecognizedText
 import fr.calevent.core.parse.TextElement
@@ -11,6 +14,7 @@ import java.awt.Color
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import java.io.File
+import java.time.LocalDate
 import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
 import kotlin.math.max
@@ -67,6 +71,89 @@ class AutoCropEval {
         }
         println(report)
         File(out, "report.txt").writeText(report.toString())
+    }
+
+    /**
+     * Replays the automatic upright step ([Orientation.detect]) on each reported photo and on the photos of
+     * `data/small`, each turned by 0, 90, 180 and 270 degrees: quick reading of the whole 1024 px photo, then of its
+     * central part of the 1600 px photo, cleaned, in each orientation. Prints the rotation chosen against the expected one.
+     */
+    /** Clockwise rotation that makes the photos of `data/small` upright (the others are upright as stored). */
+    private val SMALL_TURNS = mapOf("IMG_2929" to 180, "IMG_2930" to 270, "IMG_2931" to 270)
+
+    @Test
+    fun orientations() {
+        assumeTrue(root.isDirectory, "no data/issues folder: nothing to evaluate")
+        // Clockwise rotation that makes each source upright.
+        val sources = listOf(
+            File(root, "recadrage_play_v0.9.0/photo1.jpeg") to 180,
+            File(root, "recadrage_play_v0.9.0/photo2.jpeg") to 180,
+            File(root, "recadrage_play_v0.9.0/photo3.jpeg") to 0,
+        ) + File(root, "../small").listFiles { f -> f.name.endsWith(".jpg") }.orEmpty().sortedBy { it.name }
+            .map { it to (SMALL_TURNS[it.nameWithoutExtension] ?: 0) }
+        val only = System.getenv("CROP_ONLY") ?: ""
+        val today = LocalDate.of(2026, 11, 24)
+        val report = StringBuilder()
+        var ok = 0
+        var total = 0
+        for ((f, truth) in sources.filter { it.first.name.startsWith(only) }) {
+            val full = scaled(ImageIO.read(f), 1600)
+            for (r in intArrayOf(0, 90, 180, 270)) {
+                val big = rotated(full, r)
+                val photo = scaled(big, 1024)
+                val start = System.nanoTime()
+                var reads = 0
+                val upright = tesseract(photo)
+                val scores = StringBuilder()
+                val chosen = Orientation.detect(upright, today, ShiftCodeTable()) { deg ->
+                    reads++
+                    tesseract(cleaned(central(rotated(big, deg)))).also {
+                        scores.append(" %d:%.1f/%.1f".format(deg, Orientation.score(it, today), Orientation.readableWords(it)))
+                    }
+                }
+                val ms = (System.nanoTime() - start) / 1_000_000
+                val expected = ((truth - r) % 360 + 360) % 360
+                total++
+                if (chosen == expected) ok++
+                report.appendLine("%-14s turned %3d: chosen %3d expected %3d %s (%d extra reads, %d ms)%s".format(
+                    f.nameWithoutExtension, r, chosen, expected, if (chosen == expected) "ok" else "WRONG", reads, ms, scores,
+                ))
+            }
+        }
+        report.appendLine("$ok / $total")
+        println(report)
+        File(root, "out").mkdirs()
+        File(root, "out/orientation.txt").writeText(report.toString())
+    }
+
+    /** [img] in gray, cleaned by [OcrPreprocess] as the foss engine does before reading. */
+    private fun cleaned(img: BufferedImage): BufferedImage {
+        val px = OcrPreprocess.process(gray(img), img.width, img.height)
+        val out = BufferedImage(img.width, img.height, BufferedImage.TYPE_BYTE_GRAY)
+        out.raster.setPixels(0, 0, img.width, img.height, px)
+        return out
+    }
+
+    /** Central part of [img] (70 % of each side), as the app reads it to compare orientations. */
+    private fun central(img: BufferedImage): BufferedImage {
+        val w = (img.width * 0.7).toInt()
+        val h = (img.height * 0.7).toInt()
+        return img.getSubimage((img.width - w) / 2, (img.height - h) / 2, w, h)
+    }
+
+    /** [img] turned clockwise by [degrees] (a multiple of 90). */
+    private fun rotated(img: BufferedImage, degrees: Int): BufferedImage {
+        if (degrees % 360 == 0) return img
+        val quarter = degrees % 180 != 0
+        val out = BufferedImage(if (quarter) img.height else img.width, if (quarter) img.width else img.height, BufferedImage.TYPE_INT_RGB)
+        val g = out.createGraphics()
+        val t = java.awt.geom.AffineTransform()
+        t.translate(out.width / 2.0, out.height / 2.0)
+        t.rotate(Math.toRadians(degrees.toDouble()))
+        t.translate(-img.width / 2.0, -img.height / 2.0)
+        g.drawImage(img, t, null)
+        g.dispose()
+        return out
     }
 
     /**

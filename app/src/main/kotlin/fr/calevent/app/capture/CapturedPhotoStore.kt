@@ -53,15 +53,20 @@ object CapturedPhotoStore {
     fun set(uri: Uri) {
         deleteFile(_photo.value)
         autoCropDone = null
+        autoOrientDone = null
         _photo.value = CapturedPhoto(uri, id = ++nextId)
     }
 
     fun rotateRight() = rotate(1)
     fun rotateLeft() = rotate(3)
 
-    /** Rotating resets the crop, since it is expressed in displayed coordinates, and so allows a new suggestion. */
+    /**
+     * Rotating resets the crop, since it is expressed in displayed coordinates, and so allows a new suggestion.
+     * The user chose the orientation: it is not searched automatically any more for this photo.
+     */
     private fun rotate(delta: Int) {
         autoCropDone = null
+        autoOrientDone = _photo.value?.id
         _photo.update { p -> p?.copy(quarterTurns = (p.quarterTurns + delta) % 4, crop = null) }
     }
 
@@ -81,10 +86,35 @@ object CapturedPhotoStore {
         if (now.id == photo.id) autoCropDone = photo.id to photo.quarterTurns
     }
 
+    // Photo id for which the automatic orientation was searched (or the user turned the photo himself).
+    private var autoOrientDone: Long? = null
+
+    /** True once the orientation of [photo] was searched automatically or chosen by the user. */
+    fun isAutoOrientDone(photo: CapturedPhoto) = autoOrientDone == photo.id
+
+    /** Records that the orientation search finished for [photo]. */
+    fun markAutoOrientDone(photo: CapturedPhoto) {
+        if (_photo.value?.id == photo.id) autoOrientDone = photo.id
+    }
+
+    /**
+     * Applies an automatic orientation ([quarterTurns], clockwise, 0..3) and [crop] (in the turned photo's
+     * coordinates, or null) found for [photo], and records both searches as done. Ignored when the photo was
+     * replaced, turned or cropped meanwhile.
+     */
+    fun applyAutoOrientation(photo: CapturedPhoto, quarterTurns: Int, crop: CropRect?) {
+        val now = _photo.value ?: return
+        if (now.id != photo.id || now.quarterTurns != photo.quarterTurns || now.crop != null) return
+        autoOrientDone = now.id
+        autoCropDone = now.id to quarterTurns
+        _photo.value = now.copy(quarterTurns = quarterTurns, crop = crop)
+    }
+
     /** Forgets the current photo and deletes its cache file. */
     fun clear() {
         deleteFile(_photo.value)
         autoCropDone = null
+        autoOrientDone = null
         _photo.value = null
     }
 

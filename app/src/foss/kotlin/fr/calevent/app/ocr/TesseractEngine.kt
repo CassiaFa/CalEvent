@@ -61,6 +61,16 @@ internal class TesseractEngine(private val context: Context) : OcrEngine {
             }
         }
 
+    /** The cleaned page read in sparse mode, without the cell-by-cell reading of a table (much faster). */
+    override suspend fun recognizeQuick(bitmap: Bitmap): RecognizedText =
+        withContext(Dispatchers.Default) {
+            mutex.withLock {
+                val (gray, w, h) = uprightGray(bitmap, 0, bitmap.width, bitmap.height)
+                val clean = OcrPreprocess.process(gray, w, h)
+                RecognizedText(w, h, readPage(engine(), clean, w, h)).scaled(bitmap.width.toDouble() / w, bitmap.width, bitmap.height)
+            }
+        }
+
     override fun close() {
         api?.recycle()
         api = null
