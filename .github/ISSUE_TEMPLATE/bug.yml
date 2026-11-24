@@ -1,0 +1,69 @@
+name: Bug
+description: Quelque chose ne marche pas comme prévu
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci ! **Ce dépôt est public** : ne joignez pas de photo de planning (noms, lieux, absences).
+        Des captures de l'app sont bienvenues si les noms sont masqués. Si une photo est indispensable,
+        envoyez-la en privé et indiquez ici seulement sa référence.
+  - type: dropdown
+    id: variant
+    attributes:
+      label: Variante
+      options: ["ML Kit (play)", "F-Droid (foss)", "Je ne sais pas"]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version de l'app
+      description: Réglages → À propos
+      placeholder: "0.9.0"
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Téléphone
+      placeholder: "Pixel 7"
+  - type: input
+    id: android
+    attributes:
+      label: Version d'Android
+      placeholder: "Android 15 (API 35)"
+  - type: dropdown
+    id: screen
+    attributes:
+      label: Écran concerné
+      options: ["Prise de vue", "Aperçu / recadrage", "Analyse", "Résultats (Agenda)", "Résultats (Photo)", "Fiche créneau", "Envoi dans l'agenda", "Planning d'équipe", "Codes", "Réglages", "Autre"]
+  - type: dropdown
+    id: planning
+    attributes:
+      label: Type de planning
+      options: ["Calendrier mural", "Planning hebdo", "Planning d'équipe à codes", "Autre / sans objet"]
+  - type: textarea
+    id: steps
+    attributes:
+      label: Ce que vous avez fait
+      placeholder: "1. Photo depuis l'app  2. Analyser  3. …"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ce que vous attendiez
+  - type: textarea
+    id: actual
+    attributes:
+      label: Ce qui s'est passé
+      description: Captures d'écran par glisser-déposer (noms masqués).
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Gravité
+      options: ["Bloquant", "Gênant", "Détail"]

@@ -1,0 +1,43 @@
+name: Ressenti / idée
+description: Ce qui plaît, ce qui gêne, ce qui manque
+title: "[Avis] "
+labels: ["ressenti"]
+body:
+  - type: markdown
+    attributes:
+      value: "**Dépôt public** : pas de photo de planning, noms masqués sur les captures."
+  - type: dropdown
+    id: variant
+    attributes:
+      label: Variante
+      options: ["ML Kit (play)", "F-Droid (foss)", "Je ne sais pas"]
+  - type: input
+    id: version
+    attributes:
+      label: Version de l'app
+      placeholder: "0.9.0"
+  - type: input
+    id: device
+    attributes:
+      label: Téléphone
+  - type: input
+    id: android
+    attributes:
+      label: Version d'Android
+  - type: input
+    id: screen
+    attributes:
+      label: Écran ou moment concerné
+      placeholder: "Recadrage, balayage dans les résultats…"
+  - type: textarea
+    id: feeling
+    attributes:
+      label: Votre ressenti
+      description: Ce qui gêne, ce qui plaît, ce qui manque, une idée.
+    validations:
+      required: true
+  - type: dropdown
+    id: importance
+    attributes:
+      label: Importance pour vous
+      options: ["Je ne l'utiliserais pas sans", "Ce serait bien mieux", "Petit plus"]
