@@ -1,5 +1,9 @@
 package fr.calevent.app.ui.screens.settings
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.os.Build
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -31,6 +36,19 @@ import fr.calevent.app.ui.theme.ThemeMode
 @Composable
 fun AboutScreen(onBack: () -> Unit, onOpenIntro: () -> Unit, onOpenPolicy: () -> Unit, onOpenLicenses: () -> Unit) {
     val c = CalEventTheme.colors
+    val context = LocalContext.current
+    val noBrowser = stringResource(R.string.settings_about_no_browser)
+    fun open(kind: FeedbackKind) {
+        val uri = feedbackUrl(
+            kind, BuildConfig.VERSION_NAME, BuildConfig.FLAVOR,
+            "${Build.MANUFACTURER} ${Build.MODEL}", "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
+        )
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(context, noBrowser, Toast.LENGTH_SHORT).show()
+        }
+    }
     ScreenScaffold(title = stringResource(R.string.settings_about_title), onBack = onBack) {
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
@@ -51,6 +69,14 @@ fun AboutScreen(onBack: () -> Unit, onOpenIntro: () -> Unit, onOpenPolicy: () ->
                 SettingsRow(stringResource(R.string.settings_about_policy), onClick = onOpenPolicy)
                 RowDivider()
                 SettingsRow(stringResource(R.string.settings_about_licenses), onClick = onOpenLicenses)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SettingsGroup {
+                    SettingsRow(stringResource(R.string.settings_about_report), icon = CalEventIcons.External, onClick = { open(FeedbackKind.BUG) })
+                    RowDivider()
+                    SettingsRow(stringResource(R.string.settings_about_feedback), icon = CalEventIcons.External, onClick = { open(FeedbackKind.FEEDBACK) })
+                }
+                Text(stringResource(R.string.settings_about_feedback_note), style = CalEventTheme.type.secondary, color = c.ink2, modifier = Modifier.padding(horizontal = 16.dp))
             }
         }
     }

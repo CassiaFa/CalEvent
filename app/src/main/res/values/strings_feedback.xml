@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_about_report">Signaler un problème</string>
+    <string name="settings_about_feedback">Donner un avis</string>
+    <string name="settings_about_feedback_note">S\'ouvre dans le navigateur. Ne joignez pas de photo de planning : elle contient des noms.</string>
+    <string name="settings_about_no_browser">Aucun navigateur disponible</string>
+</resources>
