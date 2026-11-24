@@ -27,7 +27,7 @@ object ScheduleParser {
      * Parses [text] (pixel coordinates of the photo). [today] anchors years and months that are not
      * written; [codes] tells shift codes apart from other text.
      */
-    fun parse(text: RecognizedText, today: LocalDate, codes: ShiftCodeTable = ShiftCodeTable.default()): ParseResult {
+    fun parse(text: RecognizedText, today: LocalDate, codes: ShiftCodeTable = ShiftCodeTable()): ParseResult {
         val attempts = candidateRotations(text).map { analyze(text, it, today, codes) }
         val best = attempts.maxWith(compareBy<Attempt>({ it.analysis.score }, { it.analysis.size }))
 

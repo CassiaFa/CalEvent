@@ -58,7 +58,7 @@ class ShiftCodeTable private constructor(private val entries: Map<String, ShiftC
         },
     )
 
-    /** Entries in a stable order: the order they were added (defaults first). */
+    /** Entries in a stable order: the order they were added . */
     val codes: List<ShiftCode> get() = entries.values.toList()
 
     val size: Int get() = entries.size
@@ -156,7 +156,7 @@ class ShiftCodeTable private constructor(private val entries: Map<String, ShiftC
 
         /**
          * Reads the text produced by [serialize]. Invalid or duplicate lines are skipped; blank or null
-         * input gives an empty table. Use [default] yourself when nothing was stored.
+         * input gives an empty table. The table starts empty: no built-in codes.
          */
         fun parse(text: String?): ShiftCodeTable {
             val list = ArrayList<ShiftCode>()
@@ -176,24 +176,5 @@ class ShiftCodeTable private constructor(private val entries: Map<String, ShiftC
             }
             return ShiftCodeTable(list)
         }
-
-        private fun t(h: Int) = LocalTime.of(h, 0)
-
-        /** Defaults taken from the "Codes de planning" mockup. */
-        fun default(): ShiftCodeTable = ShiftCodeTable(
-            listOf(
-                ShiftCode("M06", "Matin", start = t(6), end = t(14)),
-                ShiftCode("M07", "Matin", start = t(7), end = t(15)),
-                ShiftCode("S14", "Soir", start = t(14), end = t(22)),
-                ShiftCode("J08", "Journée", start = t(8), end = t(20)),
-                ShiftCode("N08", "Nuit", start = t(21), end = t(7), endsNextDay = true),
-                ShiftCode("RH", "Repos", ShiftType.REST, allDay = true),
-                // Leave is not a medical detail: it keeps its own label.
-                ShiftCode("CA", "Congés", ShiftType.REST, allDay = true),
-                ShiftCode("AB", "Absence", ShiftType.ABSENCE, allDay = true),
-                // Sick leave: always shown as a bare "Absence", never the medical code.
-                ShiftCode("MAL", "Absence", ShiftType.ABSENCE, allDay = true),
-            ),
-        )
     }
 }

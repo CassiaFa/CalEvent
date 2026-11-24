@@ -1,6 +1,7 @@
 package fr.calevent.core.parse
 
 import fr.calevent.core.ShiftCodeTable
+import fr.calevent.core.sampleCodeTable
 import fr.calevent.core.Slot
 import fr.calevent.core.SlotStatus
 import org.junit.jupiter.api.Assumptions.assumeTrue
@@ -58,7 +59,7 @@ class TableCellReport {
     fun writeReport() {
         assumeTrue(File(root, "truth/IMG_2929.tsv").isFile, "no data/ocr-eval truth: nothing to compare")
         val today = LocalDate.of(2026, 11, 1)
-        val codes = ShiftCodeTable.default()
+        val codes = sampleCodeTable()
         val engines = OcrEvalSupport.engines().filter { it.name == "mlkit" || it.name == "psm11-kotlin" || it.name.startsWith("cells") }
         val out = StringBuilder()
         out.appendLine("truth photos: found / correct / kept correct / kept wrong (truth: 2908 = ${rows("IMG_2908").size}, 2929 = ${rows("IMG_2929").size})")

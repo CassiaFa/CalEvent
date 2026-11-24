@@ -1,6 +1,7 @@
 package fr.calevent.core.parse
 
 import fr.calevent.core.ShiftCodeTable
+import fr.calevent.core.sampleCodeTable
 import fr.calevent.core.SlotStatus
 import java.time.LocalDate
 import kotlin.test.Test
@@ -11,7 +12,7 @@ import kotlin.test.assertTrue
 class OcrConfidenceTest {
 
     private val today = LocalDate.of(2026, 11, 18)
-    private val codes = ShiftCodeTable.default()
+    private val codes = sampleCodeTable()
 
     // ---- aggregation ----
 

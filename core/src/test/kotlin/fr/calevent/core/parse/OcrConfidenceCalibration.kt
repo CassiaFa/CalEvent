@@ -1,6 +1,7 @@
 package fr.calevent.core.parse
 
 import fr.calevent.core.ShiftCodeTable
+import fr.calevent.core.sampleCodeTable
 import fr.calevent.core.Slot
 import fr.calevent.core.SlotStatus
 import org.junit.jupiter.api.Assumptions.assumeTrue
@@ -87,7 +88,7 @@ class OcrConfidenceCalibration {
     fun writeCalibration() {
         assumeTrue(root.isDirectory && File(root, "truth/IMG_2908.tsv").isFile, "no data/ocr-eval folder: nothing to calibrate")
         val today = LocalDate.of(2026, 11, 1)
-        val codes = ShiftCodeTable.default()
+        val codes = sampleCodeTable()
         val truth = truth2908()
         val cands = candidates()
         val out = StringBuilder()

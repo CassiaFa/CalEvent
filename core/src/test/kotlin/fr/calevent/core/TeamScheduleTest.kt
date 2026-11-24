@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class TeamScheduleTest {
-    private val table = ShiftCodeTable.default()
+    private val table = sampleCodeTable()
     private val codes = listOf("M06", "S14", "N08", "RH", "AB", "J08")
 
     private fun bigSchedule(): TeamSchedule {

@@ -76,7 +76,7 @@ private sealed interface Editing {
 /**
  * Shift code table (9b). [newCode] is set when the screen is opened from the results for a code that is
  * not in the table yet: a highlighted card with the code prefilled is shown on top.
- * Every change goes through [onChange] (the caller persists it); [onReset] restores the defaults.
+ * Every change goes through [onChange] (the caller persists it); [onReset] deletes every code (the table has no built-in defaults).
  */
 @Composable
 fun CodesScreen(
@@ -131,7 +131,7 @@ fun CodesScreen(
                     }
                 }
             }
-            TertiaryButton(stringResource(R.string.codes_reset), onClick = { confirmReset = true }, modifier = Modifier.fillMaxWidth())
+            if (table.codes.isNotEmpty()) TertiaryButton(stringResource(R.string.codes_reset), onClick = { confirmReset = true }, modifier = Modifier.fillMaxWidth())
         }
     }
 
@@ -386,7 +386,7 @@ private fun PickField(label: String, value: String, clickLabel: String, modifier
 
 @Composable
 private fun PreviewBody(mode: ThemeMode, newCode: String?) = CalEventTheme(mode) {
-    CodesScreen(ShiftCodeTable.default(), newCode, {}, {}, {})
+    CodesScreen(ShiftCodeTable(), newCode, {}, {}, {})
 }
 
 @Preview(name = "Codes light", widthDp = 390, heightDp = 844)

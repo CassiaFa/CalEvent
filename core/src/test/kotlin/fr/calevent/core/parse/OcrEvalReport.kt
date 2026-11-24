@@ -1,6 +1,7 @@
 package fr.calevent.core.parse
 
 import fr.calevent.core.ShiftCodeTable
+import fr.calevent.core.sampleCodeTable
 import fr.calevent.core.Slot
 import fr.calevent.core.SlotStatus
 import org.junit.jupiter.api.Assumptions.assumeTrue
@@ -24,7 +25,7 @@ class OcrEvalReport {
     fun writeReport() {
         assumeTrue(root.isDirectory, "no data/ocr-eval folder: nothing to evaluate")
         val today = LocalDate.now()
-        val codes = ShiftCodeTable.default()
+        val codes = sampleCodeTable()
         val out = StringBuilder()
         val engines = OcrEvalSupport.engines()
         for (engine in engines) {

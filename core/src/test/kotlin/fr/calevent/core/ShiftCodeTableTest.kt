@@ -9,7 +9,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ShiftCodeTableTest {
-    private val table = ShiftCodeTable.default()
+    private val table = sampleCodeTable()
     private val day = d(2026, 11, 16)
 
     @Test

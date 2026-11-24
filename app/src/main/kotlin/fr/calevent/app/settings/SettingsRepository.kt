@@ -48,9 +48,9 @@ class SettingsRepository private constructor(context: Context) {
         )
     }
 
-    /** The user's shift code table; the built-in defaults until the user changes something. */
+    /** The user's shift code table; empty until the user defines codes. */
     val codeTable: Flow<ShiftCodeTable> = store.data.map { p ->
-        p[CODE_TABLE]?.let { ShiftCodeTable.parse(it) } ?: ShiftCodeTable.default()
+        p[CODE_TABLE]?.let { ShiftCodeTable.parse(it) } ?: ShiftCodeTable()
     }
 
     suspend fun setCodeTable(table: ShiftCodeTable) = store.edit { it[CODE_TABLE] = table.serialize() }

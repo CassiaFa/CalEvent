@@ -1,6 +1,7 @@
 package fr.calevent.core.parse
 
 import fr.calevent.core.ShiftCodeTable
+import fr.calevent.core.sampleCodeTable
 import fr.calevent.core.Slot
 import fr.calevent.core.SlotStatus
 import java.time.LocalDate
@@ -28,10 +29,10 @@ class ScheduleParserTest {
         assertEquals(ScheduleKind.TEAM_HOURS, r.kind, r.toString())
         assertEquals(PhotoFixtures.weekHoursPeople, r.people)
         assertTrue(r.warnings.isEmpty(), r.warnings.toString())
-        assertTrue(r.slotsFor(null, ShiftCodeTable.default()).isEmpty(), "nobody selected by default")
+        assertTrue(r.slotsFor(null, sampleCodeTable()).isEmpty(), "nobody selected by default")
         assertEquals(32, r.slots.size)
 
-        val aubert = r.slotsFor("mme aubert", ShiftCodeTable.default())
+        val aubert = r.slotsFor("mme aubert", sampleCodeTable())
         assertEquals(
             listOf(
                 listOf(d(2026, 10, 19), t(8, 30), t(17, 30), "Dépôt Nord"),
@@ -47,13 +48,13 @@ class ScheduleParserTest {
         assertTrue(region.left in 0.24..0.32 && region.top in 0.27..0.31, region.toString())
 
         // "l4h à 22h": read as 14h, slightly less confident but still kept.
-        val blanc = r.slotsFor("M. Blanc", ShiftCodeTable.default()).first()
+        val blanc = r.slotsFor("M. Blanc", sampleCodeTable()).first()
         assertEquals(listOf(d(2026, 10, 19), t(14), t(22), "Dépôt Sud"), listOf(blanc.date, blanc.start, blanc.end, blanc.title))
         assertEquals(SlotStatus.KEPT, blanc.status)
         assertTrue(blanc.confidence < aubert[0].confidence)
 
         // Badly printed place: to review with a written reason.
-        val hamel = r.slotsFor("M. Hamel", ShiftCodeTable.default())
+        val hamel = r.slotsFor("M. Hamel", sampleCodeTable())
         assertEquals(listOf(d(2026, 10, 22), d(2026, 10, 24)), hamel.map { it.date })
         assertEquals(SlotStatus.TO_REVIEW, hamel[1].status)
         assertEquals("Texte peu lisible", hamel[1].reviewReason)
@@ -67,7 +68,7 @@ class ScheduleParserTest {
         val r = ScheduleParser.parse(PhotoFixtures.weekColon(), today)
         assertEquals(ScheduleKind.TEAM_HOURS, r.kind, r.toString())
         assertEquals(PhotoFixtures.weekColonPeople, r.people)
-        val arnaud = r.slotsFor("Mme Arnaud", ShiftCodeTable.default())
+        val arnaud = r.slotsFor("Mme Arnaud", sampleCodeTable())
         assertEquals(
             listOf(
                 listOf(d(2027, 11, 22), t(13), t(17), "Dépôt Sud"),
@@ -79,7 +80,7 @@ class ScheduleParserTest {
         )
         assertTrue(arnaud.last().endsNextDay)
         // Two cells merged by OCR into one line are split back into Friday and Saturday.
-        val etienne = r.slotsFor("M. Etienne", ShiftCodeTable.default())
+        val etienne = r.slotsFor("M. Etienne", sampleCodeTable())
         assertEquals(
             listOf(
                 listOf(d(2027, 11, 22), t(7, 30), t(12, 30), "Atelier 2"),
@@ -93,7 +94,7 @@ class ScheduleParserTest {
             etienne.brief(),
         )
         // The Sunday column is drawn higher (perspective) but stays on the right rows.
-        assertEquals(listOf(d(2027, 11, 28), t(22), t(6)), r.slotsFor("M. Garnier", ShiftCodeTable.default()).last().let { listOf(it.date, it.start, it.end) })
+        assertEquals(listOf(d(2027, 11, 28), t(22), t(6)), r.slotsFor("M. Garnier", sampleCodeTable()).last().let { listOf(it.date, it.start, it.end) })
         val expected = PhotoFixtures.weekColonCells.sumOf { row -> row.count { it.isNotEmpty() } } + 2
         assertEquals(expected, r.slots.size)
         assertTrue(r.slots.all { it.status == SlotStatus.KEPT }, r.slots.filter { it.status != SlotStatus.KEPT }.toString())
@@ -153,7 +154,7 @@ class ScheduleParserTest {
         val sick = r.slotsFor("Roux Antoine", PhotoFixtures.careCodes).first()
         assertEquals(listOf("Absence", ""), listOf(sick.title, sick.sourceText))
         // With the default table the care-home codes are unknown: to review, reason written.
-        val unknown = r.slotsFor("Garnier Paul", ShiftCodeTable.default()).first { it.date == d(2027, 1, 28) }
+        val unknown = r.slotsFor("Garnier Paul", sampleCodeTable()).first { it.date == d(2027, 1, 28) }
         assertEquals(SlotStatus.TO_REVIEW, unknown.status)
         assertEquals("Code inconnu : G03", unknown.reviewReason)
     }

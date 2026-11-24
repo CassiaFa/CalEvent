@@ -1,6 +1,7 @@
 package fr.calevent.core.parse
 
 import fr.calevent.core.ShiftCodeTable
+import fr.calevent.core.sampleCodeTable
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
@@ -137,7 +138,7 @@ class TextPatternsTest {
 
     @Test
     fun `codes are normalized`() {
-        val table = ShiftCodeTable.default()
+        val table = sampleCodeTable()
         assertEquals("M06" to true, fixCode("MO6", table))
         assertEquals("N08" to false, fixCode("N08", table))
         assertEquals("RH" to false, fixCode("rh", table))

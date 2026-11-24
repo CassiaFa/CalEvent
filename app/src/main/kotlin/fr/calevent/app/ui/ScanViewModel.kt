@@ -135,7 +135,7 @@ class ScanViewModel : ViewModel() {
     private var existingJob: Job? = null
     private var analysisJob: Job? = null
     private val analyzer = ScanAnalyzer()
-    private var codes: ShiftCodeTable = ShiftCodeTable.default()
+    private var codes: ShiftCodeTable = ShiftCodeTable()
 
     /** Decisions and edits per slot for the whole scan session (kept when switching person). */
     private var memory = SlotMemory()

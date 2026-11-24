@@ -1,7 +1,10 @@
 package fr.calevent.core.parse
 
 import fr.calevent.core.ShiftCodeTable
+import fr.calevent.core.sampleCodeTable
 import fr.calevent.core.SlotStatus
+import fr.calevent.core.resolveUnknownCodes
+import fr.calevent.core.unknownCodesOf
 import java.time.LocalDate
 import java.time.LocalTime
 import kotlin.test.Test
@@ -13,7 +16,7 @@ import kotlin.test.assertTrue
 class ScheduleParserEdgeCasesTest {
 
     private val today = LocalDate.of(2026, 11, 18)
-    private val codes = ShiftCodeTable.default()
+    private val codes = sampleCodeTable()
     private fun d(y: Int, m: Int, day: Int) = LocalDate.of(y, m, day)
     private fun t(h: Int, m: Int = 0) = LocalTime.of(h, m)
 
@@ -47,6 +50,22 @@ class ScheduleParserEdgeCasesTest {
         assertEquals(listOf("Congés", "Congés"), alice.takeLast(2).map { it.title })
         assertTrue(alice.all { it.status == SlotStatus.KEPT })
         assertEquals(listOf(d(2026, 12, 28), d(2026, 12, 29), d(2026, 12, 31), d(2027, 1, 1), d(2027, 1, 3)), r.slotsFor("Lopez Chloé", codes).map { it.date })
+    }
+
+    @Test
+    fun `empty code table still detects a team planning and defining codes resolves them`() {
+        val empty = ShiftCodeTable()
+        val r = ScheduleParser.parse(yearEnd("Planning — Décembre 2026 / Janvier 2027", yearEndHeaders), today, empty)
+        assertEquals(ScheduleKind.TEAM_CODES, r.kind, r.toString())
+        val alice = r.slotsFor("Valdez Alice", empty)
+        assertEquals(7, alice.size)
+        assertTrue(alice.all { it.status == SlotStatus.TO_REVIEW && it.unknownCode != null })
+        assertEquals(listOf("M06", "N08", "RH", "CA"), unknownCodesOf(alice, empty))
+        val resolved = codes.resolveUnknownCodes(alice)
+        assertTrue(resolved.all { it.unknownCode == null })
+        assertEquals("Nuit (N08)", resolved[2].title)
+        val partial = ShiftCodeTable().add(codes.find("M06")!!).resolveUnknownCodes(alice)
+        assertEquals(listOf("N08", "RH", "CA"), unknownCodesOf(partial, ShiftCodeTable().add(codes.find("M06")!!)))
     }
 
     @Test

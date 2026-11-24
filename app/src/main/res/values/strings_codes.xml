@@ -37,15 +37,15 @@
     <string name="codes_delete_title">Supprimer le code %s ?</string>
     <string name="codes_delete_message">Les prochains plannings qui l\'utilisent seront signalés comme code inconnu.</string>
     <string name="codes_delete_confirm">Supprimer</string>
-    <string name="codes_reset">Rétablir les codes par défaut</string>
-    <string name="codes_reset_title">Rétablir les codes par défaut ?</string>
-    <string name="codes_reset_message">Vos modifications et vos codes ajoutés seront perdus.</string>
-    <string name="codes_reset_confirm">Rétablir</string>
-    <string name="codes_empty">Aucun code. Ajoutez-en un ou rétablissez les codes par défaut.</string>
+    <string name="codes_reset">Tout supprimer</string>
+    <string name="codes_reset_title">Tout supprimer ?</string>
+    <string name="codes_reset_message">Tous vos codes seront supprimés. Ils seront proposés de nouveau à la prochaine lecture d\'un planning à codes.</string>
+    <string name="codes_reset_confirm">Tout supprimer</string>
+    <string name="codes_empty">Aucun code pour l\'instant. Ils seront proposés quand un planning à codes sera lu.</string>
     <string name="codes_define">Définir ce code</string>
     <plurals name="codes_unknown_banner">
-        <item quantity="one">%1$d code inconnu : %2$s</item>
-        <item quantity="other">%1$d codes inconnus : %2$s</item>
+        <item quantity="one">Planning à codes : %1$d code à définir (%2$s)</item>
+        <item quantity="other">Planning à codes : %1$d codes à définir (%2$s)</item>
     </plurals>
-    <string name="codes_unknown_define">Définir</string>
+    <string name="codes_unknown_define">Définir ces codes</string>
 </resources>

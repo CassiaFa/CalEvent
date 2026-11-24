@@ -2,6 +2,7 @@ package fr.calevent.core.parse
 
 import fr.calevent.core.ShiftCode
 import fr.calevent.core.ShiftCodeTable
+import fr.calevent.core.sampleCodeTable
 import fr.calevent.core.ShiftType
 import java.time.LocalTime
 
@@ -12,7 +13,7 @@ import java.time.LocalTime
 internal object PhotoFixtures {
 
     /** Default table plus the extra codes seen on the care-home schedules. */
-    val careCodes: ShiftCodeTable = ShiftCodeTable.default()
+    val careCodes: ShiftCodeTable = sampleCodeTable()
         .add(ShiftCode("G03", "Garde", start = LocalTime.of(7, 0), end = LocalTime.of(19, 0)))
         .add(ShiftCode("G05", "Garde", start = LocalTime.of(9, 0), end = LocalTime.of(21, 0)))
         .add(ShiftCode("J09", "Journée", start = LocalTime.of(9, 0), end = LocalTime.of(17, 0)))
